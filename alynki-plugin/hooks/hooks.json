@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Alynki context is available for this session and has not been loaded yet. The load_context tool returns it.'"
+          }
+        ]
+      }
+    ]
+  }
+}
