@@ -1,0 +1,12 @@
+{
+  "name": "alynki-marketplace",
+  "description": "Humans and agents inherit what the work requires — and nothing more.",
+  "owner": { "name": "Tiago Bevilacqua" },
+  "plugins": [
+    {
+      "name": "alynki",
+      "source": "./alynki-plugin",
+      "description": "Loads your team's shared Alynki context into every session, scoped to your token"
+    }
+  ]
+}

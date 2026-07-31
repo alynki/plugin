@@ -1,0 +1,20 @@
+name: no-confidential-content
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  banner-grep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if a confidentiality banner appears anywhere
+        run: |
+          # Marker assembled from parts so this workflow never matches itself.
+          MARKER='CONFIDENTIAL — DO NOT'
+          if grep -rn --exclude-dir=.git --exclude-dir=.github "$MARKER DISTRIBUTE" .; then
+            echo "::error::Pre-patent material detected. This repository must stay publishable — see README content policy."
+            exit 1
+          fi
+          echo "No confidentiality banners found."

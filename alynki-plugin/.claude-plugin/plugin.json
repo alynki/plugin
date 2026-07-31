@@ -1,0 +1,15 @@
+{
+  "name": "alynki",
+  "version": "0.1.0",
+  "description": "Alynki product-context inheritance",
+  "author": { "name": "Tiago Bevilacqua" },
+  "userConfig": {
+    "token": {
+      "type": "string",
+      "title": "Alynki API token",
+      "description": "Issued to you by your Alynki operator",
+      "sensitive": true,
+      "required": true
+    }
+  }
+}

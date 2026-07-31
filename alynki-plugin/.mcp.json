@@ -1,0 +1,8 @@
+{
+  "alynki": {
+    "type": "http",
+    "url": "https://placeholder-awaiting-cloud-run.invalid/mcp",
+    "headers": { "Authorization": "Bearer ${user_config.token}" },
+    "alwaysLoad": true
+  }
+}
