@@ -1,0 +1,12 @@
+{
+  "name": "alynki-marketplace",
+  "description": "Alynki — cross-team shared context for AI agents",
+  "owner": { "name": "Tiago Bevilacqua" },
+  "plugins": [
+    {
+      "name": "alynki",
+      "source": "./alynki-plugin",
+      "description": "Loads your team's shared Alynki context into every session, scoped to your token"
+    }
+  ]
+}
