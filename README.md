@@ -28,13 +28,14 @@ claude plugin install alynki@alynki-marketplace --config token=<token>
 
 ## Status
 
-- The hosted server URL in `alynki-plugin/.mcp.json` is a **placeholder** (a reserved
-  `.invalid` domain) until the production service is live (alynki/alynki#118). For local
-  development, point it at a locally running server (e.g. `http://127.0.0.1:8080/mcp`) as an
-  uncommitted working-copy change — the placeholder is what `main` carries.
+- `alynki-plugin/.mcp.json` carries the **live hosted endpoint** (Cloud Run,
+  `australia-southeast2`). For local development against a local server, override the URL to
+  `http://127.0.0.1:8080/mcp` as an **uncommitted** working-copy change and add the marketplace
+  from the local clone — `main` only ever carries production.
 - **Visibility staging:** this repository is **private through V1.2** — colleagues install
-  using their own granted git access. It goes **public only after the provisional patent
-  application is filed** (alynki/alynki#28).
+  using their own granted git access (⚠️ if the clone fails with "Repository not found", the
+  SSH key GitHub picked lacks access — pass an explicit git URL for the right identity).
+  It goes **public only after the provisional patent application is filed** (alynki/alynki#28).
 
 ## Content policy — read before adding anything
 
