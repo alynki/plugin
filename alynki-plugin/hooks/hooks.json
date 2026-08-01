@@ -9,6 +9,16 @@
           }
         ]
       }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"SubagentStart\",\"additionalContext\":\"Alynki context is available for this session and has not been loaded yet. The load_context tool returns it.\"}}'"
+          }
+        ]
+      }
     ]
   }
 }
