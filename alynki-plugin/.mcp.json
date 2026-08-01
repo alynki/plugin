@@ -1,7 +1,7 @@
 {
   "alynki": {
     "type": "http",
-    "url": "https://placeholder-awaiting-cloud-run.invalid/mcp",
+    "url": "https://alynki-mcp-server-1049459919093.australia-southeast2.run.app/mcp",
     "headers": { "Authorization": "Bearer ${user_config.token}" },
     "alwaysLoad": true
   }
