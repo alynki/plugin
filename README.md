@@ -58,7 +58,7 @@ Installing prompts for three values, issued to you by your Alynki operator:
 Non-interactive form:
 
 ```
-claude plugin install alynki-sealed@alynki-marketplace --config token=<token> key=<key> key_id=<key-id>
+claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --config key=<key> --config key_id=<key-id>
 ```
 
 ## What it installs
