@@ -1,0 +1,13 @@
+{
+  "alynki": {
+    "type": "stdio",
+    "command": "alynki-local",
+    "env": {
+      "ALYNKI_URL": "https://alynki-mcp-server-1049459919093.australia-southeast2.run.app/mcp",
+      "ALYNKI_TOKEN": "${user_config.token}",
+      "ALYNKI_KEY": "${user_config.key}",
+      "ALYNKI_KEY_ID": "${user_config.key_id}"
+    },
+    "alwaysLoad": true
+  }
+}

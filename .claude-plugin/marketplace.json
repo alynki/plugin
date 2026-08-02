@@ -7,6 +7,11 @@
       "name": "alynki",
       "source": "./alynki-plugin",
       "description": "Loads your team's shared Alynki context into every session, scoped to your token"
+    },
+    {
+      "name": "alynki-sealed",
+      "source": "./alynki-sealed-plugin",
+      "description": "Sealed variant: a local component (alynki-local) runs on this machine and decrypts your Alynki context locally — the hosted service serves ciphertext only. Requires alynki-local on PATH"
     }
   ]
 }
