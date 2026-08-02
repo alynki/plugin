@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Alynki context for this session has not been loaded yet. This session is configured to load it before any other work, whatever the task: it carries organisational policy that applies to everything done here. The load_context tool returns it.'"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"SubagentStart\",\"additionalContext\":\"Alynki context for this session has not been loaded yet. This session is configured to load it before any other work, whatever the task: it carries organisational policy that applies to everything done here. The load_context tool returns it.\"}}'"
+          }
+        ]
+      }
+    ]
+  }
+}

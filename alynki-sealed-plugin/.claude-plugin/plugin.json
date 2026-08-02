@@ -1,0 +1,28 @@
+{
+  "name": "alynki-sealed",
+  "version": "0.1.0",
+  "description": "Alynki product-context inheritance, sealed: a local component decrypts context on this machine",
+  "author": { "name": "Tiago Bevilacqua" },
+  "userConfig": {
+    "token": {
+      "type": "string",
+      "title": "Alynki API token",
+      "description": "Issued to you by your Alynki operator",
+      "sensitive": true,
+      "required": true
+    },
+    "key": {
+      "type": "string",
+      "title": "Alynki organisation key",
+      "description": "Your organisation's content key (base64url). It stays on this machine and is never sent to Alynki",
+      "sensitive": true,
+      "required": true
+    },
+    "key_id": {
+      "type": "string",
+      "title": "Alynki key id",
+      "description": "The id of your organisation key, issued alongside it",
+      "required": true
+    }
+  }
+}
