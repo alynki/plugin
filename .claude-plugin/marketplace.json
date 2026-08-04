@@ -1,7 +1,9 @@
 {
   "name": "alynki-marketplace",
-  "description": "Humans and agents inherit what the work requires — and nothing more.",
-  "owner": { "name": "Alynki" },
+  "description": "Humans and agents inherit what the work requires \u2014 and nothing more.",
+  "owner": {
+    "name": "Alynki"
+  },
   "plugins": [
     {
       "name": "alynki",
@@ -11,7 +13,7 @@
     {
       "name": "alynki-sealed",
       "source": "./alynki-sealed-plugin",
-      "description": "Sealed variant: a local component (alynki-local) runs on this machine and decrypts your Alynki context locally — the hosted service serves ciphertext only. Requires alynki-local on PATH"
+      "description": "Sealed variant: a local component (alynki-local) runs on this machine \u2014 it decrypts your Alynki context locally and does chunked saves and paged loads here, so the hosted service serves and stores ciphertext only. Requires alynki-local on PATH"
     }
   ]
 }
