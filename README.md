@@ -63,12 +63,25 @@ claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --
 
 ## What it installs
 
-- An MCP connection exposing one tool: `load_context`. The tool takes no arguments — scope
-  comes entirely from your token. In the standard variant the connection goes directly to
-  Alynki's hosted server; in the sealed variant it goes to the local `alynki-local`
-  process, which calls the hosted server and decrypts the result. The tool name and the
-  payload are the same either way.
+- An MCP connection exposing the Alynki tools. What a session is offered depends on the
+  **class of your credential**: an agent (pinned) credential is offered `load_context` and
+  `save_context` with **no address argument** — scope comes entirely from the token, so an
+  injected instruction has no way to redirect it. A human (interactive) credential is
+  additionally offered `list_nodes`, `create_context`, the four typed prompts (`/load`,
+  `/save`, `/create`, `/list`) and the optional whole-path `address` argument.
+- **Large context is handled for you.** A body too large for one tool call is sent in chunks
+  (`mode: stage` … `mode: commit`) and a large context is served in pages under a cursor the
+  model echoes back. The tool descriptions and prompts carry the rules; nothing about it is
+  configured here.
+- In the standard variant the connection goes directly to Alynki's hosted server; in the
+  sealed variant it goes to the local `alynki-local` process, which calls the hosted server,
+  decrypts the result, and does the chunking and paging on this machine so the hosted service
+  sees only whole ciphertext. The tool names and the rendered payload are the same either way.
 - A `SessionStart` hook stating that context is available to load.
+
+⚠️ The sealed variant requires the **`alynki-local` binary on your PATH**; installing the
+plugin does not install it. A new sealed capability reaches you only with a redistributed
+binary.
 
 ## Status
 

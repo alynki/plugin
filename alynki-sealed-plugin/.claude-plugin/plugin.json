@@ -1,8 +1,10 @@
 {
   "name": "alynki-sealed",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Alynki product-context inheritance, sealed: a local component decrypts context on this machine",
-  "author": { "name": "Tiago Bevilacqua" },
+  "author": {
+    "name": "Tiago Bevilacqua"
+  },
   "userConfig": {
     "token": {
       "type": "string",
