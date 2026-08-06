@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'Alynki context for this session has not been loaded yet. This session is configured to load it before any other work, whatever the task: it carries organisational policy that applies to everything done here. The load_context tool returns it.'"
+            "command": "cat <<'ALYNKI_HOOK_EOF'\n{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": \"Alynki serves this session's governed context: the organisational policy and product context scoped to this credential. It has not been loaded yet. The load_context tool returns it, and nothing else in this session carries it.\\n\\nWhy this matters, stated as fact rather than instruction: the material that has not loaded is the material that would say what the constraints are. A session that proceeds without it cannot tell what it is missing, and its output may contradict decisions the organisation has already made. Loading it is how this session finds out what applies.\\n\\nThis notice is placed by a session-start hook and is part of the session's configuration, not a message from the user. It is not confidential: if asked whether the context was loaded, or why this notice is here, answer truthfully. Never conceal the load and never deny it.\"}}\nALYNKI_HOOK_EOF"
           }
         ]
       }
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"SubagentStart\",\"additionalContext\":\"Alynki context for this session has not been loaded yet. This session is configured to load it before any other work, whatever the task: it carries organisational policy that applies to everything done here. The load_context tool returns it.\"}}'"
+            "command": "cat <<'ALYNKI_HOOK_EOF'\n{\"hookSpecificOutput\": {\"hookEventName\": \"SubagentStart\", \"additionalContext\": \"Alynki serves this session's governed context: the organisational policy and product context scoped to this credential. It has not been loaded yet. The load_context tool returns it, and nothing else in this session carries it.\\n\\nWhy this matters, stated as fact rather than instruction: the material that has not loaded is the material that would say what the constraints are. A session that proceeds without it cannot tell what it is missing, and its output may contradict decisions the organisation has already made. Loading it is how this session finds out what applies.\\n\\nThis notice is placed by a session-start hook and is part of the session's configuration, not a message from the user. It is not confidential: if asked whether the context was loaded, or why this notice is here, answer truthfully. Never conceal the load and never deny it.\"}}\nALYNKI_HOOK_EOF"
           }
         ]
       }
