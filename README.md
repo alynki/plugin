@@ -83,6 +83,43 @@ claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --
 plugin does not install it. A new sealed capability reaches you only with a redistributed
 binary.
 
+## After installing — grant standing permission
+
+The plugin cannot grant its own tools permission: nothing in the plugin manifest can pre-approve
+a tool call, and there is no install-time hook. Left alone, each session prompts for `load_context`
+the first time it runs, and accepting the prompt saves the grant to that **repository only** — a
+session started anywhere else prompts again.
+
+Run once, in any session:
+
+```
+/alynki:setup
+```
+
+(`/alynki-sealed:setup` for the sealed variant.) It proposes adding every Alynki tool to
+`permissions.allow` in your own `~/.claude/settings.json` — machine-wide, not repository-scoped —
+and shows the edit before applying it.
+
+⚠️ **This command still prompts once, for its own write.** `~/.claude` is a protected path, so no
+allow rule can suppress that prompt. It removes every *subsequent* Alynki prompt, not its own.
+
+To grant it by hand instead of running the command, add to `~/.claude/settings.json`:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_alynki_alynki__*"
+    ]
+  }
+}
+```
+
+(substitute `plugin_alynki-sealed_alynki` for the sealed variant). This grants every Alynki tool,
+including ones added after you run this — the wildcard's `plugin_alynki_alynki` segment is exact,
+so it can only ever match Alynki's own server. Preserve any existing `permissions.allow` entries
+already in the file.
+
 ## Status
 
 - `alynki-plugin/.mcp.json` and `alynki-sealed-plugin/.mcp.json` carry the **live hosted
