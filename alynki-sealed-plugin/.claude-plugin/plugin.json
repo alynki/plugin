@@ -1,6 +1,6 @@
 {
   "name": "alynki-sealed",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Alynki product-context inheritance, sealed: a local component decrypts context on this machine",
   "author": {
     "name": "Alynki"

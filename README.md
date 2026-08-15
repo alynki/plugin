@@ -123,8 +123,10 @@ already in the file.
 ## Status
 
 - `alynki-plugin/.mcp.json` and `alynki-sealed-plugin/.mcp.json` carry the **live hosted
-  endpoint** (Cloud Run,
-  `australia-southeast2`). For local development against a local server, override the URL to
+  endpoint** — `https://mcp.alynki.com/mcp`, a global anycast address in front of the service
+  (the path from hostname to serving revision is
+  `alynki/docs/architecture/dns-and-request-routing.md`). For local development against a local
+  server, override the URL to
   `http://127.0.0.1:8080/mcp` as an **uncommitted** working-copy change and add the marketplace
   from the local clone — `main` only ever carries production.
 - **Visibility staging:** this repository is **private through V1.2** — colleagues install
