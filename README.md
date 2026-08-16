@@ -6,7 +6,7 @@ session, scoped to your token.
 Two variants ship from this marketplace: **`alynki`** (the standard install) and
 **`alynki-sealed`** (for organisations that have opted into sealing — context is decrypted
 locally on your machine). Install one or the other, as your Alynki operator directs. Once
-installed they behave identically: same tool, same context.
+installed they behave identically: same tools, same context.
 
 ## Install — `alynki` (standard)
 
@@ -33,14 +33,16 @@ endpoint, and it decrypts your context locally. The hosted service stores and se
 ciphertext only; your organisation key never leaves this machine.
 
 `alynki-local` must be installed and on your `PATH` before the plugin can serve context.
-For now, build it from the `mcp-server` repository:
+Your Alynki operator provides the binary for your platform — installing the plugin does not
+install it. Confirm before continuing:
 
-```
-go install github.com/alynki/mcp-server/cmd/alynki-local@latest
+```sh
+which alynki-local     # must print a path
 ```
 
-(or `go install ./cmd/alynki-local` from a checkout — per-platform packaging and signing
-are tracked upstream). Then:
+(Building from source — `go install ./cmd/alynki-local` from an `mcp-server` checkout — is an
+operator/developer path, not a colleague path; per-platform packaging and signing are tracked at
+alynki/alynki#231.) Then:
 
 ```
 /plugin marketplace add alynki/plugin
@@ -67,17 +69,22 @@ claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --
   **class of your credential**: an agent (pinned) credential is offered `load_context` and
   `save_context` with **no address argument** — scope comes entirely from the token, so an
   injected instruction has no way to redirect it. A human (interactive) credential is
-  additionally offered `list_nodes`, `create_context`, the four typed prompts (`/load`,
-  `/save`, `/create`, `/list`) and the optional whole-path `address` argument.
-- **Large context is handled for you.** A body too large for one tool call is sent in chunks
-  (`mode: stage` … `mode: commit`) and a large context is served in pages under a cursor the
-  model echoes back. The tool descriptions and prompts carry the rules; nothing about it is
+  additionally offered `list_nodes`, `create_context`, `set_default_context`, `update_node`,
+  `delete_node` and `move_node`, the typed prompts (`/load`, `/save`, `/create`, `/list`,
+  `/set-default`, `/update`, `/delete`, `/move`) and the optional whole-path `address`
+  argument.
+- **Large context is handled for you — on the human (interactive) surface.** A body too large
+  for one tool call is sent in chunks (`mode: stage` … `mode: commit`) and a large context is
+  served in pages under a cursor the model echoes back; a pinned (agent) session receives its
+  payload whole, and an oversized body is refused at the cap rather than staged. The tool descriptions and prompts carry the rules; nothing about it is
   configured here.
 - In the standard variant the connection goes directly to Alynki's hosted server; in the
   sealed variant it goes to the local `alynki-local` process, which calls the hosted server,
   decrypts the result, and does the chunking and paging on this machine so the hosted service
   sees only whole ciphertext. The tool names and the rendered payload are the same either way.
-- A `SessionStart` hook stating that context is available to load.
+- `SessionStart` and `SubagentStart` hooks that instruct every session — and every subagent —
+  to call `load_context` first (`SessionStart` emits both `initialUserMessage` and
+  `additionalContext`; `SubagentStart` emits `additionalContext`).
 
 ⚠️ The sealed variant requires the **`alynki-local` binary on your PATH**; installing the
 plugin does not install it. A new sealed capability reaches you only with a redistributed
@@ -124,20 +131,21 @@ already in the file.
 
 - `alynki-plugin/.mcp.json` and `alynki-sealed-plugin/.mcp.json` carry the **live hosted
   endpoint** — `https://mcp.alynki.com/mcp`, a global anycast address in front of the service
-  (the path from hostname to serving revision is
-  `alynki/docs/architecture/dns-and-request-routing.md`). For local development against a local
+  (the path from hostname to serving revision is `alynki/alynki`
+  `docs/architecture/dns-and-request-routing.md`). For local development against a local
   server, override the URL to
   `http://127.0.0.1:8080/mcp` as an **uncommitted** working-copy change and add the marketplace
   from the local clone — `main` only ever carries production.
-- **Visibility staging:** this repository is **private through V1.2** — colleagues install
-  using their own granted git access (⚠️ if the clone fails with "Repository not found", the
-  SSH key GitHub picked lacks access — pass an explicit git URL for the right identity).
-  It goes **public only after the provisional patent application is filed** (alynki/alynki#28).
+- **Visibility:** this repository is **private**. Making it public is a deliberate founder
+  decision, taken separately. While private, colleagues
+  install using their own granted git access (⚠️ if the clone fails with "Repository not
+  found", the SSH key GitHub picked lacks access — pass an explicit git URL for the right
+  identity).
 
 ## Content policy — read before adding anything
 
 **Assume this repository becomes public.** It exists precisely so the plugin can be
-installed without access to `alynki/alynki`, which is private and pre-patent.
+installed without access to `alynki/alynki`, which is private.
 
 This repository contains **only** the plugin and its marketplace manifest. The following are
 **explicitly excluded** and must never be added: VISION, architecture documents, feature
