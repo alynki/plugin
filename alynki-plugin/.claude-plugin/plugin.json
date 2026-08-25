@@ -1,7 +1,7 @@
 {
   "name": "alynki",
-  "version": "0.6.3",
-  "description": "Alynki product-context inheritance",
+  "version": "0.7.0",
+  "description": "Alynki — the business context layer: governed context, workstreams and gates, inherited into every session",
   "author": {
     "name": "Tiago Bevilacqua"
   },

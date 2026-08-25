@@ -1,7 +1,12 @@
 # Alynki plugin
 
-The Claude Code plugin for Alynki — loads your team's shared product context into every
-session, scoped to your token.
+> Knowledge is inherited, not rediscovered.
+
+The Claude Code plugin for Alynki, the business context layer — it loads your organisation's
+governed context into every session: the policy and product context that applies to the scope
+your credential holds and, where that scope sits in a workstream, the steps, gates and runs that
+define how the work is done. Alynki delivers to a principal only what that principal is granted;
+it does not constrain what an agent obtains from other sources.
 
 Two variants ship from this marketplace: **`alynki`** (the standard install) and
 **`alynki-sealed`** (for organisations that have opted into sealing — context is decrypted
@@ -68,11 +73,20 @@ claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --
 - An MCP connection exposing the Alynki tools. What a session is offered depends on the
   **class of your credential**: an agent (pinned) credential is offered `load_context` and
   `save_context` with **no address argument** — scope comes entirely from the token, so an
-  injected instruction has no way to redirect it. A human (interactive) credential is
-  additionally offered `list_nodes`, `create_context`, `set_default_context`, `update_node`,
-  `delete_node` and `move_node`, the typed prompts (`/load`, `/save`, `/create`, `/list`,
-  `/set-default`, `/update`, `/delete`, `/move`) and the optional whole-path `address`
-  argument.
+  injected instruction has no way to redirect it. A human (interactive) credential is offered
+  all twenty-one tools: additionally `list_nodes`, `create_node`, `set_default_context`,
+  `update_node`, `delete_node`, `move_node`, the workstream tools (`create_workstream`,
+  `load_workstream`, `list_workstreams`, `update_workstream`, `move_workstream`,
+  `delete_workstream`, `create_step`, `create_gate`) and the run tools (`create_run`,
+  `save_run`, `load_run`, `list_runs`, `delete_run`); one typed prompt per tool (`/load`,
+  `/save`, `/create`, `/list`, `/set-default`, `/update`, `/delete`, `/move`,
+  `/create-workstream`, `/load-workstream`, `/list-workstreams`, `/update-workstream`,
+  `/move-workstream`, `/delete-workstream`, `/create-step`, `/create-gate`, `/create-run`,
+  `/save-run`, `/load-run`, `/list-runs`, `/delete-run`), each taking one whole-string
+  argument; and the optional whole-path `address` argument (with `run` at a step or a gate).
+  The tools that change structure in more than one place — creating a workstream or a run,
+  reshaping, moving or deleting a workstream, deleting a run — answer a preview first and act
+  only on a second call carrying the `confirm` token the preview returned.
 - **Large context is handled for you — on the human (interactive) surface.** A body too large
   for one tool call is sent in chunks (`mode: stage` … `mode: commit`) and a large context is
   served in pages under a cursor the model echoes back; a pinned (agent) session receives its
