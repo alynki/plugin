@@ -1,6 +1,6 @@
 {
   "name": "alynki-marketplace",
-  "description": "Humans and agents inherit what the work requires \u2014 and nothing more.",
+  "description": "Knowledge is inherited, not rediscovered.",
   "owner": {
     "name": "Alynki"
   },
@@ -8,7 +8,7 @@
     {
       "name": "alynki",
       "source": "./alynki-plugin",
-      "description": "Loads your team's shared Alynki context into every session, scoped to your token"
+      "description": "Loads your organisation's governed context — policy, product context, and the workstreams, gates and runs that define how work is done — into every session, scoped to your credential"
     },
     {
       "name": "alynki-sealed",
