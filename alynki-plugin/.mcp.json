@@ -2,7 +2,7 @@
   "alynki": {
     "type": "http",
     "url": "https://mcp.alynki.com/mcp",
-    "headers": { "Authorization": "Bearer ${user_config.token}" },
+    "headersHelper": "${CLAUDE_PLUGIN_ROOT}/bin/headers.sh",
     "alwaysLoad": true
   }
 }
