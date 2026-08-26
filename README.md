@@ -21,8 +21,24 @@ installed they behave identically: same tools, same context.
 /reload-plugins
 ```
 
-Installing prompts once for your Alynki API token (issued to you by your Alynki operator).
-The token is masked and stored in your OS keychain — no config file is edited by hand.
+Installing prompts once for an **optional** Alynki API token.
+
+- **New to Alynki? Leave it blank and sign in with your own identity.** The first tool call
+  offers OAuth — a browser opens, you sign in, and Claude Code keeps your session refreshed
+  automatically. Nothing is typed here.
+- **Already have a pinned token from your Alynki operator, and were using it before this
+  version?** Keep using it — paste it here. **Do not switch to sign-in yet**: today, signing in
+  resolves to a *new* identity distinct from your existing one, so switching would put you on a
+  narrower, freshly-provisioned account rather than the one your operator already scoped for
+  you. This is a known limitation, not an oversight (alynki/alynki#398 §5) — it will be lifted
+  when identity linking ships.
+- **Automation (CI, an agent) always uses a pinned token** — sign-in needs a human in a browser.
+
+⚠️ **A configured token here is stored in plaintext** in this plugin's own `settings.json`, not
+your OS keychain — the script that reads it at connect time has no way to read your keychain.
+Issue it at the narrowest scope your automation actually needs, and treat it with the same care
+as any other plaintext secret on this machine. (Signing in instead avoids this entirely: Claude
+Code manages that credential in its own, more private storage.)
 
 Provisioning automation uses the non-interactive form:
 
@@ -55,14 +71,22 @@ alynki/alynki#231.) Then:
 /reload-plugins
 ```
 
-Installing prompts for three values, issued to you by your Alynki operator:
+Installing prompts for three values, **all optional** — every one of them can instead be set up
+by running `alynki-local` directly, once, from a terminal:
 
-- **Alynki API token** — masked, stored in your OS keychain.
-- **Alynki organisation key** — masked, stored in your OS keychain. It is handed only to
-  the local `alynki-local` process and is never sent to Alynki.
-- **Alynki key id** — the (non-secret) identifier of that key.
+- **Alynki API token** — leave blank and run `alynki-local login` instead to sign in with your
+  own identity (same guidance as the standard install above: an existing colleague with a pinned
+  token should keep it, not switch, until identity linking ships). If you do paste a token here,
+  it is stored in this plugin's own `settings.json`, plaintext, for the same reason as the
+  standard variant — `alynki-local login`'s own credential storage (your OS keychain, with a
+  file fallback) is the better place for a long-lived credential when sign-in is available to
+  you.
+- **Alynki organisation key** and **Alynki key id** — leave both blank and run
+  `alynki-local key import` instead (with `ALYNKI_KEY`/`ALYNKI_KEY_ID` set in your shell for that
+  one command). The key then lives in `alynki-local`'s own credential store — your OS keychain,
+  never this plugin's configuration — rather than here.
 
-Non-interactive form:
+Non-interactive form, if you are pasting values directly:
 
 ```
 claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --config key=<key> --config key_id=<key-id>
