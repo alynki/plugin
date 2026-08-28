@@ -24,27 +24,21 @@ a value that differs per tenant (alynki/alynki multi-tenant routing design). Two
 /reload-plugins
 ```
 
-This installs the skills and hooks (including `/alynki:setup` below) but no MCP tools yet — add
-the connection with `claude mcp add`, which natively supports both a per-tenant URL and a custom
-auth header in one command:
+That is the whole install. **The MCP connection is bundled** — there is no separate
+`claude mcp add` step, and nothing to type but your own credential.
 
-```
-claude mcp add --transport http --scope user alynki \
-  https://mcp.alynki.com/<your-tenant>/mcp \
-  --header "Authorization: Bearer <your-token>"
-```
+**To sign in with your own identity**, install and use it: the first call returns 401 and Claude
+Code offers OAuth. Nothing to configure.
 
-- **`<your-tenant>`** — the path segment your Alynki operator gives you (it's your organisation's
-  own tenant identifier, e.g. `acme`).
-- **`<your-token>`** — a pinned token from your Alynki operator. **To sign in with your own
-  identity instead**, omit `--header` entirely; Claude Code offers OAuth on first use.
-- **`--scope user`** makes the connection available in every project on this machine, matching
-  how the plugin's own hooks always load. Use `--scope project` instead to scope it to one repo.
-- **Automation (CI, an agent) always uses a pinned token** — sign-in needs a human in a browser.
+**If your operator issued you a pinned token**, put it in the plugin's **Alynki API token** field
+(`/plugin`, or `--config token=…` on install). Automation — CI, an agent — always uses a pinned
+token, since sign-in needs a human in a browser.
 
-This is standard Claude Code functionality (`claude mcp add --help`), not plugin-specific — the
-same shape as any other custom MCP connector. Revoke or rotate with `claude mcp remove alynki`
-then re-add.
+Both credential paths run through one plugin because the connection uses a `headersHelper` script
+rather than a static header: it emits the `Authorization` header only when a token is configured,
+and `{}` otherwise. ⚠️ A **static** `headers.Authorization` key would disable Claude Code's OAuth
+fallback unconditionally, *even when its interpolated value is empty* — so the choice has to be made
+at connection time, from configuration, never from a key in `.mcp.json`.
 
 ## Install — `alynki-sealed`
 
@@ -71,16 +65,10 @@ alynki/alynki#231.) Then:
 /reload-plugins
 ```
 
-Installing prompts for four values — **tenant is required, the other three are optional**
-(every one of the optional three can instead be set up by running `alynki-local` directly, once,
-from a terminal):
+Installing prompts for three values, **all optional** (every one can instead be set up by running
+`alynki-local` directly, once, from a terminal). ⚠️ **No tenant is asked for.** Your tenant is
+resolved from your credential, server-side — see *Status* below.
 
-- **Alynki tenant** — the path segment your Alynki operator gives you (your organisation's own
-  tenant identifier, e.g. `acme`). Unlike the standard variant, this plugin *does* bundle the MCP
-  connection — it spawns `alynki-local` locally and hands it this value as an environment
-  variable, so the tenant lives in the same place as everything else here (Claude Code exports
-  every one of these fields to the spawned process; no separate `claude mcp add` step needed for
-  this variant).
 - **Alynki API token** — leave blank and run `alynki-local login` instead to sign in with your
   own identity (same guidance as the standard install above: an existing colleague with a pinned
   token should keep it, not switch, until identity linking ships). If you do paste a token here,
@@ -96,7 +84,7 @@ from a terminal):
 Non-interactive form, if you are pasting values directly:
 
 ```
-claude plugin install alynki-sealed@alynki-marketplace --config tenant=<tenant> --config token=<token> --config key=<key> --config key_id=<key-id>
+claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --config key=<key> --config key_id=<key-id>
 ```
 
 ## What it installs
@@ -176,14 +164,14 @@ already in the file.
 
 ## Status
 
-- **The hosted endpoint is per-tenant, not one shared URL** —
-  `https://mcp.alynki.com/<tenant>/mcp` (multi-tenant routing, alynki/alynki#575/#581). The
-  standard variant has no `.mcp.json` of its own; the tenant-scoped URL is supplied by whoever
-  installs, via `claude mcp add` (see above). The sealed variant's `alynki-sealed-plugin/.mcp.json`
-  builds the same URL from the `tenant` field: `ALYNKI_URL: "https://mcp.alynki.com/${user_config.tenant}/mcp"`.
-  For local development against a local server, override with an **uncommitted** working-copy
-  change (or, for the standard variant, `claude mcp add` your own local URL directly) — `main`
-  only ever carries production.
+- **One shared endpoint — `https://mcp.alynki.com/mcp`.** Your tenant is resolved server-side from
+  the credential you present, never from the URL, so **neither variant asks you for a tenant** and
+  both `.mcp.json` files carry the same literal URL. The per-tenant paths that existed briefly
+  (`https://mcp.alynki.com/<tenant>/mcp`) are retired and now 404.
+  ⚠️ This is not only a convenience: **RFC 9728 §3.3 requires** the `resource` identifier a client
+  is handed to be identical to the URL it dialled, so one shared dialled URL and one shared resource
+  identifier are the same decision. For local development against a local server, override with an
+  **uncommitted** working-copy change — `main` only ever carries production.
 - **Visibility:** this repository is **private**. Making it public is a deliberate founder
   decision, taken separately. While private, colleagues
   install using their own granted git access (⚠️ if the clone fails with "Repository not
