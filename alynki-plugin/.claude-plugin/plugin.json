@@ -1,8 +1,17 @@
 {
   "name": "alynki",
-  "version": "0.9.0",
-  "description": "Alynki — the business context layer: governed context, workstreams and gates, inherited into every session. The MCP connection itself is configured separately with `claude mcp add` — see the setup skill.",
+  "version": "0.10.0",
+  "description": "Alynki \u2014 the business context layer: governed context, workstreams and gates, inherited into every session.",
   "author": {
     "name": "Alynki"
+  },
+  "userConfig": {
+    "token": {
+      "type": "string",
+      "title": "Alynki API token (optional \u2014 leave blank to sign in instead)",
+      "description": "Issued to you by your Alynki operator. Leave this blank to sign in with your own identity instead \u2014 Claude Code will offer OAuth on first use. A configured token is stored in this plugin's settings.json, not the OS keychain, since the value must be readable by this plugin's headersHelper script.",
+      "sensitive": false,
+      "required": false
+    }
   }
 }

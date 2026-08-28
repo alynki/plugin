@@ -1,34 +1,28 @@
 {
   "name": "alynki-sealed",
-  "version": "0.7.0",
-  "description": "Alynki — the business context layer, sealed: a local component decrypts context on this machine",
+  "version": "0.8.0",
+  "description": "Alynki \u2014 the business context layer, sealed: a local component decrypts context on this machine",
   "author": {
     "name": "Alynki"
   },
   "userConfig": {
-    "tenant": {
-      "type": "string",
-      "title": "Alynki tenant",
-      "description": "The path segment your Alynki operator gives you (your organisation's own tenant identifier, e.g. \"acme\") — every tenant is served at its own URL (multi-tenant routing, alynki/alynki#575/#581), so this is required, not optional.",
-      "required": true
-    },
     "token": {
       "type": "string",
-      "title": "Alynki API token (optional — leave blank to sign in instead)",
+      "title": "Alynki API token (optional \u2014 leave blank to sign in instead)",
       "description": "Issued to you by your Alynki operator. Leave this blank to sign in with your own identity instead: run `alynki-local login` once per machine.",
       "sensitive": true,
       "required": false
     },
     "key": {
       "type": "string",
-      "title": "Alynki organisation key (optional — set once via alynki-local key import)",
-      "description": "Your organisation's content key (base64url). It stays on this machine and is never sent to Alynki. Leave this blank and run `alynki-local key import` once instead — the key then lives in this machine's own credential store rather than in this plugin's configuration.",
+      "title": "Alynki organisation key (optional \u2014 set once via alynki-local key import)",
+      "description": "Your organisation's content key (base64url). It stays on this machine and is never sent to Alynki. Leave this blank and run `alynki-local key import` once instead \u2014 the key then lives in this machine's own credential store rather than in this plugin's configuration.",
       "sensitive": true,
       "required": false
     },
     "key_id": {
       "type": "string",
-      "title": "Alynki key id (optional — set once via alynki-local key import)",
+      "title": "Alynki key id (optional \u2014 set once via alynki-local key import)",
       "description": "The id of your organisation key, issued alongside it. Leave this blank if you imported the key with `alynki-local key import`.",
       "required": false
     }
