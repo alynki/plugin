@@ -1,8 +1,0 @@
-{
-  "alynki": {
-    "type": "http",
-    "url": "https://mcp.alynki.com/mcp",
-    "headersHelper": "${CLAUDE_PLUGIN_ROOT}/bin/headers.sh",
-    "alwaysLoad": true
-  }
-}
