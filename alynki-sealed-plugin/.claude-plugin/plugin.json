@@ -1,11 +1,17 @@
 {
   "name": "alynki-sealed",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Alynki — the business context layer, sealed: a local component decrypts context on this machine",
   "author": {
     "name": "Tiago Bevilacqua"
   },
   "userConfig": {
+    "tenant": {
+      "type": "string",
+      "title": "Alynki tenant",
+      "description": "The path segment your Alynki operator gives you (your organisation's own tenant identifier, e.g. \"acme\") — every tenant is served at its own URL (multi-tenant routing, alynki/alynki#575/#581), so this is required, not optional.",
+      "required": true
+    },
     "token": {
       "type": "string",
       "title": "Alynki API token (optional — leave blank to sign in instead)",

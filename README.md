@@ -15,36 +15,36 @@ installed they behave identically: same tools, same context.
 
 ## Install — `alynki` (standard)
 
+The MCP connection itself is **not** bundled in this plugin — a shared, static URL can't carry
+a value that differs per tenant (alynki/alynki multi-tenant routing design). Two steps:
+
 ```
 /plugin marketplace add alynki/plugin
 /plugin install alynki@alynki-marketplace
 /reload-plugins
 ```
 
-Installing prompts once for an **optional** Alynki API token.
+This installs the skills and hooks (including `/alynki:setup` below) but no MCP tools yet — add
+the connection with `claude mcp add`, which natively supports both a per-tenant URL and a custom
+auth header in one command:
 
-- **New to Alynki? Leave it blank and sign in with your own identity.** The first tool call
-  offers OAuth — a browser opens, you sign in, and Claude Code keeps your session refreshed
-  automatically. Nothing is typed here.
-- **Already have a pinned token from your Alynki operator, and were using it before this
-  version?** Keep using it — paste it here. **Do not switch to sign-in yet**: today, signing in
-  resolves to a *new* identity distinct from your existing one, so switching would put you on a
-  narrower, freshly-provisioned account rather than the one your operator already scoped for
-  you. This is a known limitation, not an oversight (alynki/alynki#398 §5) — it will be lifted
-  when identity linking ships.
+```
+claude mcp add --transport http --scope user alynki \
+  https://mcp.alynki.com/<your-tenant>/mcp \
+  --header "Authorization: Bearer <your-token>"
+```
+
+- **`<your-tenant>`** — the path segment your Alynki operator gives you (it's your organisation's
+  own tenant identifier, e.g. `acme`).
+- **`<your-token>`** — a pinned token from your Alynki operator. **To sign in with your own
+  identity instead**, omit `--header` entirely; Claude Code offers OAuth on first use.
+- **`--scope user`** makes the connection available in every project on this machine, matching
+  how the plugin's own hooks always load. Use `--scope project` instead to scope it to one repo.
 - **Automation (CI, an agent) always uses a pinned token** — sign-in needs a human in a browser.
 
-⚠️ **A configured token here is stored in plaintext** in this plugin's own `settings.json`, not
-your OS keychain — the script that reads it at connect time has no way to read your keychain.
-Issue it at the narrowest scope your automation actually needs, and treat it with the same care
-as any other plaintext secret on this machine. (Signing in instead avoids this entirely: Claude
-Code manages that credential in its own, more private storage.)
-
-Provisioning automation uses the non-interactive form:
-
-```
-claude plugin install alynki@alynki-marketplace --config token=<token>
-```
+This is standard Claude Code functionality (`claude mcp add --help`), not plugin-specific — the
+same shape as any other custom MCP connector. Revoke or rotate with `claude mcp remove alynki`
+then re-add.
 
 ## Install — `alynki-sealed`
 
@@ -71,9 +71,16 @@ alynki/alynki#231.) Then:
 /reload-plugins
 ```
 
-Installing prompts for three values, **all optional** — every one of them can instead be set up
-by running `alynki-local` directly, once, from a terminal:
+Installing prompts for four values — **tenant is required, the other three are optional**
+(every one of the optional three can instead be set up by running `alynki-local` directly, once,
+from a terminal):
 
+- **Alynki tenant** — the path segment your Alynki operator gives you (your organisation's own
+  tenant identifier, e.g. `acme`). Unlike the standard variant, this plugin *does* bundle the MCP
+  connection — it spawns `alynki-local` locally and hands it this value as an environment
+  variable, so the tenant lives in the same place as everything else here (Claude Code exports
+  every one of these fields to the spawned process; no separate `claude mcp add` step needed for
+  this variant).
 - **Alynki API token** — leave blank and run `alynki-local login` instead to sign in with your
   own identity (same guidance as the standard install above: an existing colleague with a pinned
   token should keep it, not switch, until identity linking ships). If you do paste a token here,
@@ -89,7 +96,7 @@ by running `alynki-local` directly, once, from a terminal:
 Non-interactive form, if you are pasting values directly:
 
 ```
-claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --config key=<key> --config key_id=<key-id>
+claude plugin install alynki-sealed@alynki-marketplace --config tenant=<tenant> --config token=<token> --config key=<key> --config key_id=<key-id>
 ```
 
 ## What it installs
@@ -167,13 +174,14 @@ already in the file.
 
 ## Status
 
-- `alynki-plugin/.mcp.json` and `alynki-sealed-plugin/.mcp.json` carry the **live hosted
-  endpoint** — `https://mcp.alynki.com/mcp`, a global anycast address in front of the service
-  (the path from hostname to serving revision is `alynki/alynki`
-  `docs/architecture/dns-and-request-routing.md`). For local development against a local
-  server, override the URL to
-  `http://127.0.0.1:8080/mcp` as an **uncommitted** working-copy change and add the marketplace
-  from the local clone — `main` only ever carries production.
+- **The hosted endpoint is per-tenant, not one shared URL** —
+  `https://mcp.alynki.com/<tenant>/mcp` (multi-tenant routing, alynki/alynki#575/#581). The
+  standard variant has no `.mcp.json` of its own; the tenant-scoped URL is supplied by whoever
+  installs, via `claude mcp add` (see above). The sealed variant's `alynki-sealed-plugin/.mcp.json`
+  builds the same URL from the `tenant` field: `ALYNKI_URL: "https://mcp.alynki.com/${user_config.tenant}/mcp"`.
+  For local development against a local server, override with an **uncommitted** working-copy
+  change (or, for the standard variant, `claude mcp add` your own local URL directly) — `main`
+  only ever carries production.
 - **Visibility:** this repository is **private**. Making it public is a deliberate founder
   decision, taken separately. While private, colleagues
   install using their own granted git access (⚠️ if the clone fails with "Repository not
