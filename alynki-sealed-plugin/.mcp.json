@@ -3,7 +3,7 @@
     "type": "stdio",
     "command": "alynki-local",
     "env": {
-      "ALYNKI_URL": "https://mcp.alynki.com/mcp",
+      "ALYNKI_URL": "https://mcp.alynki.com/${user_config.tenant}/mcp",
       "ALYNKI_TOKEN": "${user_config.token}",
       "ALYNKI_KEY": "${user_config.key}",
       "ALYNKI_KEY_ID": "${user_config.key_id}"
