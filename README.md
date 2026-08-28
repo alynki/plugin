@@ -105,16 +105,18 @@ claude plugin install alynki-sealed@alynki-marketplace --config tenant=<tenant> 
   **class of your credential**: an agent (pinned) credential is offered `load_context` and
   `save_context` with **no address argument** — scope comes entirely from the token, so an
   injected instruction has no way to redirect it. A human (interactive) credential is offered
-  all twenty-one tools: additionally `list_nodes`, `create_node`, `set_default_context`,
+  all twenty-four tools: additionally `list_nodes`, `create_node`, `set_default_context`,
   `update_node`, `delete_node`, `move_node`, the workstream tools (`create_workstream`,
   `load_workstream`, `list_workstreams`, `update_workstream`, `move_workstream`,
-  `delete_workstream`, `create_step`, `create_gate`) and the run tools (`create_run`,
-  `save_run`, `load_run`, `list_runs`, `delete_run`); one typed prompt per tool (`/load`,
+  `delete_workstream`, `create_step`, `create_gate`), the run tools (`create_run`,
+  `save_run`, `load_run`, `list_runs`, `delete_run`) and the non-composing reads
+  (`load_gate`, `load_step`, `list_gates` — one node's own body, or a workstream's gate
+  metadata, without walking the ancestor chain); one typed prompt per tool (`/load`,
   `/save`, `/create`, `/list`, `/set-default`, `/update`, `/delete`, `/move`,
   `/create-workstream`, `/load-workstream`, `/list-workstreams`, `/update-workstream`,
   `/move-workstream`, `/delete-workstream`, `/create-step`, `/create-gate`, `/create-run`,
-  `/save-run`, `/load-run`, `/list-runs`, `/delete-run`), each taking one whole-string
-  argument; and the optional whole-path `address` argument (with `run` at a step or a gate).
+  `/save-run`, `/load-run`, `/list-runs`, `/delete-run`, `/load-gate`, `/load-step`,
+  `/list-gates`), each taking one whole-string argument; and the optional whole-path `address` argument (with `run` at a step or a gate).
   The tools that change structure in more than one place — creating a workstream or a run,
   reshaping, moving or deleting a workstream, deleting a run — answer a preview first and act
   only on a second call carrying the `confirm` token the preview returned.
