@@ -15,9 +15,6 @@ installed they behave identically: same tools, same context.
 
 ## Install — `alynki` (standard)
 
-The MCP connection itself is **not** bundled in this plugin — a shared, static URL can't carry
-a value that differs per tenant (alynki/alynki multi-tenant routing design). Two steps:
-
 ```
 /plugin marketplace add alynki/plugin
 /plugin install alynki@alynki-marketplace
