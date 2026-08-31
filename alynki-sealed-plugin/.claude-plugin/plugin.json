@@ -1,6 +1,6 @@
 {
   "name": "alynki-sealed",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Alynki \u2014 the business context layer, sealed: a local component decrypts context on this machine",
   "author": {
     "name": "Alynki"
