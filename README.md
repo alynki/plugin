@@ -122,6 +122,15 @@ claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --
 plugin does not install it. A new sealed capability reaches you only with a redistributed
 binary.
 
+⚠️ **And that is not only about new TOOLS.** The sealed variant declares its tool descriptions
+and renders its prompts *locally*, inside `alynki-local` — so a change to the wording of either
+also reaches you only with a redistributed binary. Nothing warns you: the staleness nudge
+compares tool **schemas**, and a re-worded description or prompt leaves the schema untouched.
+V2.1.3 is the first release of exactly that shape — no new tool, no schema change, different
+words — so **reinstall `alynki-local` when the sealed plugin's version moves**, not only when a
+tool is added. A changed tool *result* is the opposite case and needs no rebuild: results are
+relayed from the hosted server verbatim.
+
 ## After installing — grant standing permission
 
 The plugin cannot grant its own tools permission: nothing in the plugin manifest can pre-approve
