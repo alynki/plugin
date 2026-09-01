@@ -4,7 +4,7 @@
 
 The Claude Code plugin for Alynki, the business context layer — it loads your organisation's
 governed context into every session: the policy and product context that applies to the scope
-your credential holds and, where that scope sits in a workstream, the steps, gates and runs that
+your credential holds and, where that scope sits in a workflow, the steps, checks and runs that
 define how the work is done. Alynki delivers to a principal only what that principal is granted;
 it does not constrain what an agent obtains from other sources.
 
@@ -91,19 +91,25 @@ claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --
   `save_context` with **no address argument** — scope comes entirely from the token, so an
   injected instruction has no way to redirect it. A human (interactive) credential is offered
   all twenty-four tools: additionally `list_nodes`, `create_node`, `set_default_context`,
-  `update_node`, `delete_node`, `move_node`, the workstream tools (`create_workstream`,
-  `load_workstream`, `list_workstreams`, `update_workstream`, `move_workstream`,
-  `delete_workstream`, `create_step`, `create_gate`), the run tools (`create_run`,
+  `update_node`, `delete_node`, `move_node`, the workflow tools (`create_workflow`,
+  `load_workflow`, `list_workflows`, `update_workflow`, `move_workflow`,
+  `delete_workflow`, `create_step`, `create_check`), the run tools (`create_run`,
   `save_run`, `load_run`, `list_runs`, `delete_run`) and the non-composing reads
-  (`load_gate`, `load_step`, `list_gates` — one node's own body, or a workstream's gate
-  metadata, without walking the ancestor chain); one typed prompt per tool (`/load`,
+  (`load_check`, `load_step`, `list_checks` — one node's own body, or a workflow's check
+  metadata, without walking the ancestor chain; `load_step` and `load_check` also take an
+  optional `run`, which appends that run's TRAIL — the whole record, what was consumed and
+  what was produced, of every step at or before this one — so an agent arriving cold can
+  work a step or judge a check from a single read); one typed prompt per tool (`/load`,
   `/save`, `/create`, `/list`, `/set-default`, `/update`, `/delete`, `/move`,
-  `/create-workstream`, `/load-workstream`, `/list-workstreams`, `/update-workstream`,
-  `/move-workstream`, `/delete-workstream`, `/create-step`, `/create-gate`, `/create-run`,
-  `/save-run`, `/load-run`, `/list-runs`, `/delete-run`, `/load-gate`, `/load-step`,
-  `/list-gates`), each taking one whole-string argument; and the optional whole-path `address` argument (with `run` at a step or a gate).
-  The tools that change structure in more than one place — creating a workstream or a run,
-  reshaping, moving or deleting a workstream, deleting a run — answer a preview first and act
+  `/create-workflow`, `/load-workflow`, `/list-workflows`, `/update-workflow`,
+  `/move-workflow`, `/delete-workflow`, `/create-step`, `/create-check`, `/create-run`,
+  `/save-run`, `/load-run`, `/list-runs`, `/delete-run`, `/load-check`, `/load-step`,
+  `/list-checks`), each taking one whole-string argument; and the optional whole-path `address` argument (with `run` at a step or a check).
+  ⚠️ A check's read carries the run's work and deliberately carries NO governing context
+  above it — not the workflow manual, not organisational context, not even its own step's
+  body — because a check is a yes/no question about work that was produced.
+  The tools that change structure in more than one place — creating a workflow or a run,
+  reshaping, moving or deleting a workflow, deleting a run — answer a preview first and act
   only on a second call carrying the `confirm` token the preview returned.
 - **Large context is handled for you — on the human (interactive) surface.** A body too large
   for one tool call is sent in chunks (`mode: stage` … `mode: commit`) and a large context is
