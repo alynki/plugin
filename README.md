@@ -90,24 +90,35 @@ claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --
   **class of your credential**: an agent (pinned) credential is offered `load_context` and
   `save_context` with **no address argument** — scope comes entirely from the token, so an
   injected instruction has no way to redirect it. A human (interactive) credential is offered
-  all twenty-four tools: additionally `list_nodes`, `create_node`, `set_default_context`,
+  all twenty-six tools: additionally `list_nodes`, `create_node`, `set_default_context`,
   `update_node`, `delete_node`, `move_node`, the workflow tools (`create_workflow`,
   `load_workflow`, `list_workflows`, `update_workflow`, `move_workflow`,
   `delete_workflow`, `create_step`, `create_check`), the run tools (`create_run`,
-  `save_run`, `load_run`, `list_runs`, `delete_run`) and the non-composing reads
+  `save_run`, `load_run`, `list_runs`, `delete_run`), the non-composing reads
   (`load_check`, `load_step`, `list_checks` — one node's own body, or a workflow's check
   metadata, without walking the ancestor chain; `load_step` and `load_check` also take an
   optional `run`, which appends that run's TRAIL — the whole record, what was consumed and
   what was produced, of every step at or before this one — so an agent arriving cold can
-  work a step or judge a check from a single read); one typed prompt per tool (`/load`,
+  work a step or judge a check from a single read) and the decision tools (`save_check`,
+  `list_pending_checks`); one typed prompt per tool (`/load`,
   `/save`, `/create`, `/list`, `/set-default`, `/update`, `/delete`, `/move`,
   `/create-workflow`, `/load-workflow`, `/list-workflows`, `/update-workflow`,
   `/move-workflow`, `/delete-workflow`, `/create-step`, `/create-check`, `/create-run`,
   `/save-run`, `/load-run`, `/list-runs`, `/delete-run`, `/load-check`, `/load-step`,
-  `/list-checks`), each taking one whole-string argument; and the optional whole-path `address` argument (with `run` at a step or a check).
+  `/list-checks`, `/save-check`, `/list-pending-checks`), each taking one whole-string argument; and the optional whole-path `address` argument (with `run` at a step or a check).
   ⚠️ A check's read carries the run's work and deliberately carries NO governing context
   above it — not the workflow manual, not organisational context, not even its own step's
   body — because a check is a yes/no question about work that was produced.
+  ⚠️ **A run stops at a check nobody has approved.** While any check on step N of a run is
+  pending or rejected, `save_run` on a later step of that run is *refused* — the hold is
+  enforced by the server, not advisory. A check declared `autonomous` is evaluated and
+  decided by the model in the same session; a check declared `human` waits for a person,
+  and `list_pending_checks` — no argument, no filter — is how a session finds every human
+  check whose step is recorded and whose decision is still open. `save_check` records it:
+  approving, rejecting and withdrawing are the same call. ⚠️ Rewriting a step's record
+  voids that step's decisions, so its checks are decided again. On the **sealed** variant a
+  check's findings are encrypted on your machine like any other body, while the decision
+  itself travels in clear — the hosted server is the thing that holds the run on it.
   The tools that change structure in more than one place — creating a workflow or a run,
   reshaping, moving or deleting a workflow, deleting a run — answer a preview first and act
   only on a second call carrying the `confirm` token the preview returned.

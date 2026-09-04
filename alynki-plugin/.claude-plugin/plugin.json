@@ -1,6 +1,6 @@
 {
   "name": "alynki",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Alynki \u2014 the business context layer: governed context, workflows and checks, inherited into every session.",
   "author": {
     "name": "Alynki"
