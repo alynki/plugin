@@ -52,7 +52,7 @@ install it. Confirm before continuing:
 which alynki-local     # must print a path
 ```
 
-(Building from source — `go install ./cmd/alynki-local` from an `mcp-server` checkout — is an
+(Building from source — `go install ./cmd/alynki-local` from an `alynki/server` checkout — is an
 operator/developer path, not a colleague path; per-platform packaging and signing are tracked at
 alynki/alynki#231.) Then:
 
