@@ -147,7 +147,10 @@ compares tool **schemas**, and a re-worded description, prompt or instructions s
 schema untouched.
 V2.1.3 is the first release of exactly that shape — no new tool, no schema change, different
 words — so **reinstall `alynki-local` when the sealed plugin's version moves**, not only when a
-tool is added. A changed tool *result* is the opposite case and needs no rebuild: results are
+tool is added. The 0.12.0 sealed / 0.14.0 hosted pair (alynki/alynki#890, #892) is the
+schema-change shape: `set_default_context` gains an optional `for_every_new_session` boolean, and
+an older `alynki-local` **withholds the tool** — one `OUT OF DATE` log line — until rebuilt, because
+it compares the schema byte-for-byte with the server's rather than mis-declare it. A changed tool *result* is the opposite case and needs no rebuild: results are
 relayed from the hosted server verbatim.
 
 ## After installing — grant standing permission
