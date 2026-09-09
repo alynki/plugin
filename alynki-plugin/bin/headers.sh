@@ -1,5 +1,5 @@
 #!/bin/sh
-# headersHelper for the alynki MCP server (V2.1, alynki/alynki#550).
+# headersHelper for the alynki MCP server.
 #
 # Emits the Authorization header only when a pinned token is configured;
 # emits {} otherwise, which Claude Code treats identically to a server with
