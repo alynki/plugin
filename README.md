@@ -80,6 +80,13 @@ your machine**: Claude Code launches it for each session, it calls the same host
 endpoint, and it decrypts your context locally. The hosted service stores and serves
 ciphertext only; your organisation key never leaves this machine.
 
+⚠️ **The trade-off: sealing needs that local process, so it works only in clients that can run
+one** — Claude Code and other CLI-class clients. **Hosted chat apps cannot use it:** claude.ai
+on the web, Desktop and mobile connect to the hosted endpoint directly and run no local process,
+so a sealed organisation's context is structurally unavailable there, and the Alynki browser app
+is unavailable to a sealed organisation too. An organisation that needs those surfaces uses the
+standard variant.
+
 `alynki-local` must be installed and on your `PATH` before the plugin can serve context.
 Your Alynki operator provides the binary for your platform — installing the plugin does not
 install it. Confirm before continuing:
