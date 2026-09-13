@@ -124,7 +124,7 @@ claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --
   **class of your credential**: an agent (pinned) credential is offered only `load_context` and
   `save_context`, with **no address argument** — scope comes entirely from the token, so an
   injected instruction has no way to redirect it. A human (interactive) credential is offered
-  all twenty-six tools, each with a matching typed slash prompt (`/load`, `/create-run`,
+  all thirty-four tools, each with a matching typed slash prompt (`/load`, `/create-run`,
   and so on) taking one whole-string argument. What each tool does, how confirm tokens, run
   holds and non-composing reads work, and how large a body it can carry are the server's own
   contract, not this plugin's — see `alynki/alynki` `docs/architecture/`.
@@ -167,6 +167,15 @@ Run once, in any session:
 `permissions.allow` in your own `~/.claude/settings.json` — machine-wide, not repository-scoped —
 and shows the edit before applying it.
 
+It also adds six exact-name rules to `permissions.ask`, so the tools that change who has access or
+create a credential — `grant_principal`, `revoke_principal`, `invite_principal`,
+`revoke_principal_invite`, `create_principal_agent` and `revoke_principal_agent` — still prompt
+before every call. Claude Code evaluates deny, then ask, then allow, so an ask rule wins over the
+wildcard. Re-running the command adds any ask rule that is missing and changes nothing else; a
+machine set up before these rules existed needs it run once more. ⚠️ The gate lives in this client:
+a non-interactive `-p` run without `--permission-prompt-tool` cannot answer the prompt, `dontAsk`
+denies these calls, and another MCP client may not prompt at all.
+
 ⚠️ **This command still prompts once, for its own write.** `~/.claude` is a protected path, so no
 allow rule can suppress that prompt. It removes every *subsequent* Alynki prompt, not its own.
 
@@ -177,14 +186,23 @@ To grant it by hand instead of running the command, add to `~/.claude/settings.j
   "permissions": {
     "allow": [
       "mcp__plugin_alynki_alynki__*"
+    ],
+    "ask": [
+      "mcp__plugin_alynki_alynki__grant_principal",
+      "mcp__plugin_alynki_alynki__revoke_principal",
+      "mcp__plugin_alynki_alynki__invite_principal",
+      "mcp__plugin_alynki_alynki__revoke_principal_invite",
+      "mcp__plugin_alynki_alynki__create_principal_agent",
+      "mcp__plugin_alynki_alynki__revoke_principal_agent"
     ]
   }
 }
 ```
 
-(substitute `plugin_alynki-sealed_alynki` for the sealed variant). This grants every Alynki tool,
-including ones added after you run this — the wildcard's `plugin_alynki_alynki` segment is exact,
-so it can only ever match Alynki's own server. Preserve any existing `permissions.allow` entries
+(substitute `plugin_alynki-sealed_alynki` for the sealed variant, in all seven entries). This grants
+every Alynki tool, including ones added after you run this — the wildcard's `plugin_alynki_alynki`
+segment is exact, so it can only ever match Alynki's own server — and keeps the prompt on the six
+access-changing tools. Preserve any existing `permissions.allow` and `permissions.ask` entries
 already in the file.
 
 ## Status
