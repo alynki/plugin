@@ -1,6 +1,6 @@
 {
   "name": "alynki",
-  "version": "0.20.0",
+  "version": "0.20.1",
   "description": "Alynki \u2014 the business context layer: governed context, workflows and checks, inherited into every session.",
   "author": {
     "name": "Alynki"
@@ -9,7 +9,7 @@
     "token": {
       "type": "string",
       "title": "Alynki API token (optional \u2014 leave blank to sign in instead)",
-      "description": "Issued to you by your Alynki operator. Leave this blank to sign in with your own identity instead \u2014 Claude Code will offer OAuth on first use. A configured token is stored in this plugin's settings.json, not the OS keychain, since the value must be readable by this plugin's headersHelper script.",
+      "description": "A pinned token: an agent you created and revealed in the Alynki app, or one issued by your Alynki operator. Leave this blank to sign in with your own identity instead \u2014 Claude Code will offer OAuth on first use. A configured token is stored in this plugin's settings.json, not the OS keychain, since the value must be readable by this plugin's headersHelper script.",
       "sensitive": false,
       "required": false
     }

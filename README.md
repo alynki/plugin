@@ -37,7 +37,7 @@ graph TB
   cc -.->|"sealed variant: routed through the local process first"| local
   local -->|"same header logic, run on this machine"| helper
   helper --> decide
-  decide -->|"yes, operator-issued"| hdr
+  decide -->|"yes: an agent revealed in the app, or operator-issued"| hdr
   decide -->|"no"| empty
   hdr -->|"call carries Authorization"| srv
   empty -->|"call carries no Authorization"| srv
@@ -64,7 +64,8 @@ That is the whole install. **The MCP connection is bundled** — there is no sep
 **To sign in with your own identity**, install and use it — nothing to configure; see
 *Credential paths* above.
 
-**If your operator issued you a pinned token**, put it in the plugin's **Alynki API token** field
+**If you hold a pinned token** — an agent you created and revealed in the Alynki app (it expires 90
+days after the reveal), or one your operator issued — put it in the plugin's **Alynki API token** field
 (`/plugin`, or `--config token=…` on install). Automation — CI, an agent — always uses a pinned
 token, since sign-in needs a human in a browser.
 

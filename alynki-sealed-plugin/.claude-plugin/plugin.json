@@ -1,6 +1,6 @@
 {
   "name": "alynki-sealed",
-  "version": "0.18.0",
+  "version": "0.18.1",
   "description": "Alynki \u2014 the business context layer, sealed: a local component decrypts context on this machine",
   "author": {
     "name": "Alynki"
@@ -9,7 +9,7 @@
     "token": {
       "type": "string",
       "title": "Alynki API token (optional \u2014 leave blank to sign in instead)",
-      "description": "Issued to you by your Alynki operator. Leave this blank to sign in with your own identity instead: run `alynki-local login` once per machine.",
+      "description": "Issued to you by your Alynki operator \u2014 a sealed organisation cannot create agents in the Alynki app. Leave this blank to sign in with your own identity instead: run `alynki-local login` once per machine.",
       "sensitive": true,
       "required": false
     },
