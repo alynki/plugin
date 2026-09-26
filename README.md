@@ -50,6 +50,10 @@ graph TB
 Key: rectangle — a process or service; diamond — a decision; cylinder — a local, on-machine
 credential store (sealed variant only); dashed edge — sealed-variant-only routing.
 
+This mechanism is unchanged for an agent working a run unattended: whatever launches the headless
+session, its only credential is its pinned token, supplied the same way as any other pinned
+session, so it loads context and works the run without ever seeing a browser sign-in prompt.
+
 ## Install — `alynki` (standard)
 
 ```
@@ -129,13 +133,22 @@ claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --
 ## What it installs
 
 - An MCP connection exposing the Alynki tools. What a session is offered depends on the
-  **class of your credential**: an agent (pinned) credential is offered only `load_context` and
-  `save_context`, with **no address argument** — scope comes entirely from the token, so an
-  injected instruction has no way to redirect it. A human (interactive) credential is offered
-  all thirty-four tools, each with a matching typed slash prompt (`/load`, `/create-run`,
-  and so on) taking one whole-string argument. What each tool does, how confirm tokens, run
+  **class of your credential**: an agent (pinned) credential — including one working a run
+  unattended, on someone else's behalf — is offered exactly **nine tools**: `load_context`,
+  `save_context`, `list_ready_runs`, `start_run`, `load_run`, `load_step`, `load_check`,
+  `save_run` and `save_check`. `load_context` and `save_context` take **no address argument** —
+  scope comes entirely from the token, so an injected instruction has no way to redirect it; the
+  run tools take only a run's own workflow and label, or a step's or check's address, handed to
+  the agent by a run's own next action, never composed by the agent itself. No authoring,
+  deletion, move, people or agent tool is served to a pinned credential — calling one is the same
+  refusal as calling a tool that does not exist. A human (interactive) credential is offered all
+  **thirty-six** tools (the same nine, plus every node, workflow, people and agent tool), each
+  with a matching typed slash prompt taking one whole-string argument, plus one composite prompt,
+  **`work-run`** — interactive sessions only, since prompts are never offered to a pinned
+  credential. What each tool does, how confirm tokens, the run lease, the context token, run
   holds and non-composing reads work, and how large a body it can carry are the server's own
-  contract, not this plugin's — see `alynki/alynki` `docs/architecture/`.
+  contract, not this plugin's — see `alynki/alynki` `docs/architecture/run-continuation.md` and
+  `docs/architecture/tool-descriptions.md`.
 - **Large context is chunked and paged for you on the human surface**; a pinned (agent) session
   receives its payload whole. The tool descriptions and prompts carry the exact rules.
 - In the standard variant the connection goes directly to Alynki's hosted server; in the
@@ -144,7 +157,9 @@ claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --
   sees only whole ciphertext. The tool names and the rendered payload are the same either way.
 - `SessionStart` and `SubagentStart` hooks that instruct every session — and every subagent —
   to call `load_context` first (`SessionStart` emits both `initialUserMessage` and
-  `additionalContext`; `SubagentStart` emits `additionalContext`).
+  `additionalContext`; `SubagentStart` emits `additionalContext`). The same text is served to
+  both credential classes: it names no tool, so it stays accurate whichever surface — nine tools
+  or thirty-six — the session was actually given.
 
 ⚠️ A new sealed capability reaches you only with a redistributed `alynki-local` binary — that is
 not only about new TOOLS. The sealed variant declares its tool descriptions,
@@ -157,6 +172,30 @@ mis-declaring it. **Reinstall `alynki-local` whenever the sealed plugin's versio
 only when a tool is added. A genuine schema change is the one case an old binary catches itself:
 it withholds the changed tool — one `OUT OF DATE` log line — until rebuilt. A changed tool
 *result*, by contrast, needs no rebuild: results are relayed from the hosted server verbatim.
+
+## Working a run
+
+A run (a workflow's steps and checks, in progress against one label) is worked the same way by
+a person or an agent: load context, take the run's lease with `start_run`, then follow each
+returned next action — `load_step`/`save_run`, or `load_check`/`save_check` — to a stop.
+
+- **In an interactive session**, use the `work-run` prompt. It takes two arguments — the
+  workflow's address and the run's label — loads context, calls `start_run`, and works the run
+  to a stop for you. It is interactive only: an agent (pinned) credential is never offered any
+  prompt. Unattended work instead polls `list_ready_runs` and starts one headless session per
+  ready run — a separate customer-side piece, not part of this plugin.
+- **A pinned agent's session** gets, from `load_context`'s last page, a `context_token` that
+  every run, step and check tool then requires; from `start_run`, a `lease_id` that every write
+  then requires, plus the run's working instructions and its first next action; and, on every
+  write, the next action to make — or a stop, such as **held for a person** (a human check's
+  evaluation was just written, or a limit was reached) or **complete**. Following the next
+  action verbatim, to a stop, is the whole loop; no tool call is ever inferred from scratch.
+- **A human check is decided in the app only, by a person, never over MCP** — by any credential,
+  pinned or interactive. `save_check` records a human check's evaluation, and that alone hands
+  the run to a person and ends the agent's turn; deciding it (`approved`) is refused and says so.
+- **A revoked agent is kept, never deleted.** Revoking removes what it can reach; the credential
+  itself, and every run record it left behind, stays for the record and shows as revoked in the
+  Alynki app.
 
 ## After installing — grant standing permission
 
