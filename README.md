@@ -154,7 +154,11 @@ claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --
 - In the standard variant the connection goes directly to Alynki's hosted server; in the
   sealed variant it goes to the local `alynki-local` process, which calls the hosted server,
   decrypts the result, and does the chunking and paging on this machine so the hosted service
-  sees only whole ciphertext. The tool names and the rendered payload are the same either way.
+  sees only whole ciphertext. The rendered payload is the same either way. **The run surface
+  above is the standard variant's**: Alynki serves runs to unsealed organisations only, so
+  `alynki-local` mirrors none of it. A sealed session is offered thirty-four tools (no
+  `list_ready_runs` or `start_run`) and thirty-four prompts (no `work-run`), and a sealed agent
+  (pinned) credential keeps `load_context` and `save_context` only.
 - `SessionStart` and `SubagentStart` hooks that instruct every session — and every subagent —
   to call `load_context` first (`SessionStart` emits both `initialUserMessage` and
   `additionalContext`; `SubagentStart` emits `additionalContext`). The same text is served to
