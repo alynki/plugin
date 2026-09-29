@@ -1,17 +1,223 @@
-# issue-link required check (alynki/alynki#1208). The logic lives in the
-# reusable workflow at alynki/github-infrastructure; see that repository's
-# README, "The issue-link check", for what it enforces.
+# The issue-link required check, as a COPY for this public repository
+# (alynki/alynki#1208). GitHub does not let a public repository call a
+# reusable workflow held in a private one, so plugin cannot `uses:`
+# alynki/github-infrastructure's issue-link.yml as the other 13 repositories
+# do. Everything from `jobs:` down is kept byte-identical to
+# alynki/github-infrastructure .github/workflows/issue-link.yml; that
+# repository's plan and drift jobs fail when the two differ
+# (scripts/check-plugin-issue-link.sh). Change the source there first, then
+# mirror it here.
 name: issue-link
 
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened, ready_for_review]
 
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+  id-token: write
+
 jobs:
   issue-link:
-    uses: alynki/github-infrastructure/.github/workflows/issue-link.yml@main
+    runs-on: ubuntu-24.04
     permissions:
-      id-token: write
+      contents: read
       issues: read
       pull-requests: read
-      contents: read
+      id-token: write
+    steps:
+      # Checked before any credential step, by branch name AND the bot that
+      # opened the PR (a name alone could be spoofed by anyone who can push a
+      # branch): dependabot/** from dependabot[bot], typed-client/** from the
+      # alynki-ci App. An exempt PR mints nothing and passes immediately.
+      - name: Exempt Dependabot and typed-client PRs (branch and author)
+        id: exempt
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          case "$BRANCH:$AUTHOR" in
+            "dependabot/"*":dependabot[bot]"|"typed-client/"*":alynki-ci[bot]") exempt=true ;;
+            *) exempt=false ;;
+          esac
+          echo "exempt=$exempt" >> "$GITHUB_OUTPUT"
+
+      - name: Pass — exempt
+        if: steps.exempt.outputs.exempt == 'true'
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          echo "issue-link: pass — $BRANCH, opened by $AUTHOR, is exempt"
+
+      # The fixtures-token pattern server's ci.yaml uses on main
+      # (alynki/alynki#1207; design docs/architecture/github-as-code.md §3):
+      # a WIF-minted, narrowed alynki-ci-read App token, read-only, scoped to
+      # exactly what this check needs — alynki/alynki, issues: read — and
+      # never a value this job could leak into another repository's PR.
+      - id: ci-read-auth
+        if: steps.exempt.outputs.exempt != 'true'
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: projects/1049459919093/locations/global/workloadIdentityPools/github/providers/github-ci
+          service_account: alynki-ci-read@alynki-prod.iam.gserviceaccount.com
+
+      # The App's private key, fetched with this job's own GCP identity;
+      # masked the moment it is read.
+      - id: ci-read-key
+        if: steps.exempt.outputs.exempt != 'true'
+        uses: google-github-actions/get-secretmanager-secrets@bc9c54b29fdffb8a47776820a7d26e77b379d262 # v3.0.0
+        with:
+          secrets: |-
+            private_key:alynki-prod/github-app-alynki-ci-read-key
+
+      # Narrowed to exactly what resolving a reference in alynki/alynki needs.
+      - id: ci-read-token
+        if: steps.exempt.outputs.exempt != 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: Iv23litAawoEYJsg5kgN # alynki-ci-read (App ID 5107709)
+          private-key: ${{ steps.ci-read-key.outputs.private_key }}
+          owner: alynki
+          repositories: alynki
+          permission-issues: read
+
+      # google-github-actions/auth exports GOOGLE_APPLICATION_CREDENTIALS and
+      # the CLOUDSDK_*/GCLOUD_*/GCP_*/GOOGLE_CLOUD_PROJECT variables job-wide
+      # (GITHUB_ENV) — cleared here, once the mint above is done, the same
+      # trap server's ci.yaml documents (alynki/alynki#1207).
+      - name: Clear the ambient GCP credentials before the check runs
+        if: steps.exempt.outputs.exempt != 'true'
+        run: |
+          {
+            echo "GOOGLE_APPLICATION_CREDENTIALS="
+            echo "CLOUDSDK_CORE_PROJECT="
+            echo "GCLOUD_PROJECT="
+            echo "GCP_PROJECT="
+            echo "GOOGLE_CLOUD_PROJECT="
+          } >> "$GITHUB_ENV"
+
+      # Untrusted text (the branch name, the PR title) reaches the script
+      # only through env:, never interpolated into this run: block — GitHub's
+      # security-hardening guide's "preferred approach to handling untrusted
+      # input". The commit messages are fetched by the script itself, inside
+      # the process, from the paginated Pulls API — never placed in `${{ }}`
+      # at all.
+      - name: issue-link check
+        if: steps.exempt.outputs.exempt != 'true'
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+          TITLE: ${{ github.event.pull_request.title }}
+          OWN_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ github.token }}
+          ALYNKI_TOKEN: ${{ steps.ci-read-token.outputs.token }}
+        run: |
+          set -euo pipefail
+
+          fail=0
+          err() { echo "::error title=issue-link::$1"; fail=1; }
+
+          # gh_issue REPO NUM TOKEN -> 0 iff REPO#NUM exists and is an issue,
+          # not a PR. The Issues API returns pull requests too; the
+          # `pull_request` field is how the API tells the two apart (a PR
+          # number is not an issue).
+          gh_issue() {
+            local repo="$1" num="$2" token="$3" out
+            [ -n "$token" ] || return 1
+            out=$(GH_TOKEN="$token" gh api "repos/$repo/issues/$num" 2>/dev/null) || return 1
+            ! printf '%s' "$out" | jq -e 'has("pull_request")' >/dev/null 2>&1
+          }
+
+          # resolve_bare NUM -> 0 iff NUM names an existing issue: OWN_REPO
+          # first (GITHUB_TOKEN), then alynki/alynki (ALYNKI_TOKEN).
+          resolve_bare() {
+            local num="$1"
+            gh_issue "$OWN_REPO" "$num" "$GITHUB_TOKEN" && return 0
+            gh_issue "alynki/alynki" "$num" "$ALYNKI_TOKEN" && return 0
+            return 1
+          }
+
+          # resolve_scoped REPO NUM -> 0 iff REPO#NUM resolves with a token
+          # this job holds. Only OWN_REPO and alynki/alynki are reachable; a
+          # reference naming any other repository cannot resolve here.
+          resolve_scoped() {
+            local repo="$1" num="$2"
+            case "$repo" in
+              "$OWN_REPO")     gh_issue "$repo" "$num" "$GITHUB_TOKEN" ;;
+              "alynki/alynki") gh_issue "$repo" "$num" "$ALYNKI_TOKEN" ;;
+              *)               return 1 ;;
+            esac
+          }
+
+          # extract_refs TEXT -> one reference per line: "owner/repo#N" or
+          # "#N". Scoped matches first, then bare "#N" on the text with every
+          # scoped match blanked out, so a scoped reference's own number is
+          # never double counted as a second, bare reference.
+          extract_refs() {
+            local text="$1" scoped stripped bare
+            scoped=$(printf '%s' "$text" | grep -oE '[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+' || true)
+            stripped=$(printf '%s' "$text" | sed -E 's|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+||g')
+            # A bare #N counts only at the start or after a non-word character,
+            # so abc#12 is not a reference to #12.
+            bare=$(printf '%s' "$stripped" | grep -oE '(^|[^A-Za-z0-9_])#[0-9]+' | grep -oE '#[0-9]+' || true)
+            { [ -n "$scoped" ] && printf '%s\n' "$scoped"; [ -n "$bare" ] && printf '%s\n' "$bare"; } || true
+          }
+
+          # resolves_any TEXT -> 0 iff at least one reference in TEXT resolves.
+          resolves_any() {
+            local text="$1" ref repo num
+            while IFS= read -r ref; do
+              [ -n "$ref" ] || continue
+              if [[ "$ref" == */*#* ]]; then
+                repo="${ref%#*}"; num="${ref##*#}"
+                resolve_scoped "$repo" "$num" && return 0
+              else
+                num="${ref#\#}"
+                resolve_bare "$num" && return 0
+              fi
+            done <<<"$(extract_refs "$text")"
+            return 1
+          }
+
+          # ---- 1. branch name ----
+          if [[ ! "$BRANCH" =~ ^([0-9]+)-[a-z0-9-]+$ ]]; then
+            err "branch '$BRANCH' is not {issueNumber}-{slug} — rename the branch to issue-slug"
+          else
+            branch_num="${BASH_REMATCH[1]}"
+            if ! resolve_bare "$branch_num"; then
+              err "branch '$BRANCH' names issue #$branch_num, which does not resolve to an existing issue in $OWN_REPO or alynki/alynki"
+            fi
+          fi
+
+          # ---- 2. PR title ----
+          if [ -z "$(extract_refs "$TITLE")" ] || ! resolves_any "$TITLE"; then
+            err "PR title '$TITLE' names no existing issue — name the issue in the title"
+          fi
+
+          # ---- 3. every commit ----
+          commits_json=$(GH_TOKEN="$GITHUB_TOKEN" gh api --paginate "repos/$OWN_REPO/pulls/$PR_NUMBER/commits" \
+            --jq '.[] | {sha, message: .commit.message}' | jq -s -c '.[]')
+          bad_commits=()
+          seen=0
+          while IFS= read -r c; do
+            [ -n "$c" ] || continue
+            seen=$((seen + 1))
+            sha=$(jq -r '.sha' <<<"$c")
+            msg=$(jq -r '.message' <<<"$c")
+            if [ -z "$(extract_refs "$msg")" ] || ! resolves_any "$msg"; then
+              bad_commits+=("${sha:0:7}")
+            fi
+          done <<<"$commits_json"
+          # Fail closed: a PR always has a commit, so none means the listing failed.
+          [ "$seen" -gt 0 ] || err "the PR's commit list came back empty; refusing to pass"
+          if [ "${#bad_commits[@]}" -gt 0 ]; then
+            err "commit(s) name no existing issue: ${bad_commits[*]}"
+          fi
+
+          if [ "$fail" -eq 0 ]; then
+            echo "issue-link: pass — branch, title and every commit reference an existing issue"
+          fi
+          exit "$fail"
