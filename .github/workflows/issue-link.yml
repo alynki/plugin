@@ -1,0 +1,17 @@
+# issue-link required check (alynki/alynki#1208). The logic lives in the
+# reusable workflow at alynki/github-infrastructure; see that repository's
+# README, "The issue-link check", for what it enforces.
+name: issue-link
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+jobs:
+  issue-link:
+    uses: alynki/github-infrastructure/.github/workflows/issue-link.yml@main
+    permissions:
+      id-token: write
+      issues: read
+      pull-requests: read
+      contents: read
