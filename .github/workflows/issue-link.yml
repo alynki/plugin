@@ -204,12 +204,16 @@ jobs:
 
           # ---- 3. every commit ----
           commits_json=$(GH_TOKEN="$GITHUB_TOKEN" gh api --paginate "repos/$OWN_REPO/pulls/$PR_NUMBER/commits" \
-            --jq '.[] | {sha, message: .commit.message}' | jq -s -c '.[]')
+            --jq '.[] | {sha, message: .commit.message, parents: (.parents | length)}' | jq -s -c '.[]')
           bad_commits=()
           seen=0
           while IFS= read -r c; do
             [ -n "$c" ] || continue
             seen=$((seen + 1))
+            # A merge commit (two parents) is skipped: "Update branch" writes "Merge
+            # branch 'main' into …", which names no issue, and a squash merge drops it
+            # anyway (its title is the checked PR title or single commit's).
+            [ "$(jq -r '.parents // 1' <<<"$c")" -gt 1 ] && continue
             sha=$(jq -r '.sha' <<<"$c")
             msg=$(jq -r '.message' <<<"$c")
             if [ -z "$(extract_refs "$msg")" ] || ! resolves_any "$msg"; then
