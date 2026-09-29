@@ -134,15 +134,15 @@ claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --
 
 - An MCP connection exposing the Alynki tools. What a session is offered depends on the
   **class of your credential**: an agent (pinned) credential — including one working a run
-  unattended, on someone else's behalf — is offered exactly **nine tools**: `load_context`,
-  `save_context`, `list_ready_runs`, `start_run`, `load_run`, `load_step`, `load_check`,
+  unattended, on someone else's behalf — is offered exactly **eight tools**: `load_context`,
+  `save_context`, `start_run`, `load_run`, `load_step`, `load_check`,
   `save_run` and `save_check`. `load_context` and `save_context` take **no address argument** —
   scope comes entirely from the token, so an injected instruction has no way to redirect it; the
   run tools take only a run's own workflow and label, or a step's or check's address, handed to
   the agent by a run's own next action, never composed by the agent itself. No authoring,
   deletion, move, people or agent tool is served to a pinned credential — calling one is the same
   refusal as calling a tool that does not exist. A human (interactive) credential is offered all
-  **thirty-six** tools (the same nine, plus every node, workflow, people and agent tool), each
+  **thirty-seven** tools (the same eight, plus every node, workflow, people and agent tool), each
   with a matching typed slash prompt taking one whole-string argument, plus one composite prompt,
   **`work-run`** — interactive sessions only, since prompts are never offered to a pinned
   credential. What each tool does, how confirm tokens, the run lease, the context token, run
@@ -156,14 +156,14 @@ claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --
   decrypts the result, and does the chunking and paging on this machine so the hosted service
   sees only whole ciphertext. The rendered payload is the same either way. **The run surface
   above is the standard variant's**: Alynki serves runs to unsealed organisations only, so
-  `alynki-local` mirrors none of it. A sealed session is offered thirty-four tools (no
-  `list_ready_runs` or `start_run`) and thirty-four prompts (no `work-run`), and a sealed agent
+  `alynki-local` mirrors none of it. A sealed session is offered thirty-six tools (no
+  `start_run`) and thirty-six prompts (no `work-run`), and a sealed agent
   (pinned) credential keeps `load_context` and `save_context` only.
 - `SessionStart` and `SubagentStart` hooks that instruct every session — and every subagent —
   to call `load_context` first (`SessionStart` emits both `initialUserMessage` and
   `additionalContext`; `SubagentStart` emits `additionalContext`). The same text is served to
-  both credential classes: it names no tool, so it stays accurate whichever surface — nine tools
-  or thirty-six — the session was actually given.
+  both credential classes: it names no tool, so it stays accurate whichever surface — eight tools
+  or thirty-seven — the session was actually given.
 
 ⚠️ A new sealed capability reaches you only with a redistributed `alynki-local` binary — that is
 not only about new TOOLS. The sealed variant declares its tool descriptions,
@@ -186,8 +186,11 @@ returned next action — `load_step`/`save_run`, or `load_check`/`save_check` �
 - **In an interactive session**, use the `work-run` prompt. It takes two arguments — the
   workflow's address and the run's label — loads context, calls `start_run`, and works the run
   to a stop for you. It is interactive only: an agent (pinned) credential is never offered any
-  prompt. Unattended work instead polls `list_ready_runs` and starts one headless session per
-  ready run — a separate customer-side piece, not part of this plugin.
+  prompt. Unattended work instead runs through `alynki-controller`, a separate customer-side
+  piece, not part of this plugin: it polls Alynki's own controller API (never MCP — a different
+  credential, a different surface entirely) for ready runs and starts one headless session per
+  run it reserves; that session then calls `load_context` and `start_run` over MCP exactly as an
+  interactive one does.
 - **A pinned agent's session** gets, from `load_context`'s last page, a `context_token` that
   every run, step and check tool then requires; from `start_run`, a `lease_id` that every write
   then requires, plus the run's working instructions and its first next action; and, on every
