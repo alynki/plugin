@@ -269,14 +269,14 @@ already in the file.
   so one shared dialled URL and one shared resource identifier are the same decision. For local
   development against a local server, override with an **uncommitted** working-copy change —
   `main` only ever carries production.
-- **Visibility:** this repository is **private**; making it public is a deliberate founder
-  decision, taken separately. While private, colleagues install using their own granted git
-  access (⚠️ a clone failing with "Repository not found" means the SSH key GitHub picked lacks
-  access — pass an explicit git URL for the right identity).
+- **Visibility:** this repository is **public** (`alynki/github-infrastructure`'s
+  `repositories.tf`; a deliberate founder decision) — a plugin marketplace must be installable
+  without git access to a private Alynki repository, and this one carries nothing that needs it
+  (see *Content policy* below).
 
 ## Content policy — read before adding anything
 
-**Assume this repository becomes public.** It exists precisely so the plugin can be
+**This repository is public.** It exists precisely so the plugin can be
 installed without access to `alynki/alynki`, which is private.
 
 This repository contains **only** the plugin and its marketplace manifest. The following are
