@@ -134,21 +134,22 @@ claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --
 
 - An MCP connection exposing the Alynki tools. What a session is offered depends on the
   **class of your credential**: an agent (pinned) credential — including one working a run
-  unattended, on someone else's behalf — is offered exactly **eight tools**: `load_context`,
-  `save_context`, `start_run`, `load_run`, `load_step`, `load_check`,
+  unattended, on someone else's behalf — is offered exactly **nine tools**: `load_context`,
+  `save_context`, `list_ready_runs`, `start_run`, `load_run`, `load_step`, `load_check`,
   `save_run` and `save_check`. `load_context` and `save_context` take **no address argument** —
   scope comes entirely from the token, so an injected instruction has no way to redirect it; the
   run tools take only a run's own workflow and label, or a step's or check's address, handed to
   the agent by a run's own next action, never composed by the agent itself. No authoring,
   deletion, move, people or agent tool is served to a pinned credential — calling one is the same
   refusal as calling a tool that does not exist. A human (interactive) credential is offered all
-  **thirty-seven** tools (the same eight, plus every node, workflow, people and agent tool), each
-  with a matching typed slash prompt taking one whole-string argument, plus one composite prompt,
-  **`work-run`** — interactive sessions only, since prompts are never offered to a pinned
-  credential. What each tool does, how confirm tokens, the run lease, the context token, run
-  holds and non-composing reads work, and how large a body it can carry are the server's own
-  contract, not this plugin's — see `alynki/alynki` `docs/architecture/run-continuation.md` and
-  `docs/architecture/tool-descriptions.md`.
+  **thirty-seven** tools (the same nine, plus every node, workflow, people and agent tool). Every
+  tool but the queue pair (`list_ready_runs`, `start_run`) has a matching typed slash prompt
+  taking one whole-string argument; that pair is instead covered by one composite prompt,
+  **`work-run`** — thirty-six prompts in all, interactive sessions only, since prompts are never
+  offered to a pinned credential. What each tool does, how confirm tokens, the run lease, the
+  context token, run holds and non-composing reads work, and how large a body it can carry are
+  the server's own contract, not this plugin's — see `alynki/alynki`
+  `docs/architecture/run-continuation.md` and `docs/architecture/tool-descriptions.md`.
 - **Large context is chunked and paged for you on the human surface**; a pinned (agent) session
   receives its payload whole. The tool descriptions and prompts carry the exact rules.
 - In the standard variant the connection goes directly to Alynki's hosted server; in the
@@ -156,13 +157,13 @@ claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --
   decrypts the result, and does the chunking and paging on this machine so the hosted service
   sees only whole ciphertext. The rendered payload is the same either way. **The run surface
   above is the standard variant's**: Alynki serves runs to unsealed organisations only, so
-  `alynki-local` mirrors none of it. A sealed session is offered thirty-six tools (no
-  `start_run`) and thirty-six prompts (no `work-run`), and a sealed agent
+  `alynki-local` mirrors none of it. A sealed session is offered thirty-five tools (no
+  `list_ready_runs`, no `start_run`) and thirty-five prompts (no `work-run`), and a sealed agent
   (pinned) credential keeps `load_context` and `save_context` only.
 - `SessionStart` and `SubagentStart` hooks that instruct every session — and every subagent —
   to call `load_context` first (`SessionStart` emits both `initialUserMessage` and
   `additionalContext`; `SubagentStart` emits `additionalContext`). The same text is served to
-  both credential classes: it names no tool, so it stays accurate whichever surface — eight tools
+  both credential classes: it names no tool, so it stays accurate whichever surface — nine tools
   or thirty-seven — the session was actually given.
 
 ⚠️ A new sealed capability reaches you only with a redistributed `alynki-local` binary — that is
