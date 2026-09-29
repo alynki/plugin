@@ -7,6 +7,11 @@
 # repository's plan and drift jobs fail when the two differ
 # (scripts/check-plugin-issue-link.sh). Change the source there first, then
 # mirror it here.
+#
+# This repository is public. A pull request from a fork gets a read-only
+# GITHUB_TOKEN and no OIDC token (GitHub enforces this, whatever the workflow
+# requests), so the App-token mint fails and the check fails closed for fork
+# PRs. No fork code is checked out or run: the job only reads PR metadata.
 name: issue-link
 
 on:
