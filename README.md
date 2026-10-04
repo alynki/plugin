@@ -65,9 +65,9 @@ graph TB
   oauth -->|"later HTTPS MCP calls carry the OAuth token"| srv
 
   cc -->|"MCP over stdio"| local
-  local -->|"reads the environment at each call"| envtok
+  local -->|"at startup: tokenSource reads ALYNKI_TOKEN"| envtok
   envtok -->|"yes: HTTPS MCP, Bearer ALYNKI_TOKEN"| srv
-  envtok -->|"no: reads the stored login"| store
+  envtok -->|"no: the stored login, resolved at each call"| store
   store -->|"found: HTTPS MCP, Bearer token"| srv
   store -->|"none stored"| err
   err -->|"tool result over stdio"| cc
