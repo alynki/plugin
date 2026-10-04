@@ -98,7 +98,8 @@ That is the whole install: **the MCP connection is bundled**, with no `claude mc
 
 **If you hold a pinned token**, an agent you revealed in the Alynki app (it expires 90 days after
 the reveal) or one your operator issued, put it in the plugin's **Alynki API token** field
-(`/plugin`, or `--config token=…` on install). Automation always uses a pinned token, since sign-in
+(`/plugin`, or `--config token=…` on install). The token is stored in `settings.json`, where `headers.sh` reads it.
+Automation always uses a pinned token, since sign-in
 needs a human in a browser.
 
 ## Install: `alynki-sealed`
