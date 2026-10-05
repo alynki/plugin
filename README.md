@@ -82,7 +82,7 @@ A static `headers.Authorization` key in `.mcp.json` would disable Claude Code's 
 unconditionally, even when its value is empty, so the standard plugin decides at connection time
 with a `headersHelper` script. The script reads the token with `jq`; without `jq` on `PATH` it emits
 no header and the session signs in instead. An agent working a run unattended has one credential,
-its pinned token, and never sees a sign-in prompt.
+the one its controller issues it, and never sees a sign-in prompt.
 
 ## Install: `alynki` (standard)
 
@@ -96,11 +96,15 @@ That is the whole install: **the MCP connection is bundled**, with no `claude mc
 
 **To sign in with your own identity**, install and use it; run `/mcp` to sign in when prompted.
 
-**If you hold a pinned token**, an agent you revealed in the Alynki app (it expires 90 days after
-the reveal) or one your operator issued, put it in the plugin's **Alynki API token** field
-(`/plugin`, or `--config token=…` on install). The token is stored in `settings.json`, where `headers.sh` reads it.
-Automation always uses a pinned token, since sign-in
-needs a human in a browser.
+**If you hold a pinned token**, one your operator issued, put it in the plugin's **Alynki API token**
+field (`/plugin`, or `--config token=…` on install). The token is stored in `settings.json`, where
+`headers.sh` reads it. Unattended automation never signs in, since sign-in needs a human in a
+browser.
+
+⚠️ **The Alynki app shows no agent token** (no "Show token"; an agent has none to reveal): an agent
+works only through the credential a controller is issued, so there is nothing to copy from the app
+into this field. A token revealed before V2.5.2 was retired; if one is still in the field, the
+server answers 401 `token not recognised`. Clear the field and sign in with `/mcp`.
 
 ## Install: `alynki-sealed`
 
@@ -161,15 +165,15 @@ graph TB
   intv{"Variant"}
   p8["alynki, pinned: 8 tools, no prompts, no address argument"]
   ps["alynki-sealed, pinned: load_context and save_context only"]
-  i37["alynki, interactive: 37 tools and 37 prompts, optional address"]
-  i36["alynki-sealed, interactive: 36 tools and 36 prompts, no start_run, no work-run"]
+  i39["alynki, interactive: 39 tools and 39 prompts, optional address"]
+  i38["alynki-sealed, interactive: 38 tools and 38 prompts, no start_run, no work-run"]
 
   cls -->|"tools/list over MCP: pinned token, an agent"| pinv
   cls -->|"tools/list over MCP: interactive token, a human"| intv
   pinv -->|"HTTP connection"| p8
   pinv -->|"stdio connection via alynki-local"| ps
-  intv -->|"HTTP connection"| i37
-  intv -->|"stdio connection via alynki-local"| i36
+  intv -->|"HTTP connection"| i39
+  intv -->|"stdio connection via alynki-local"| i38
 ```
 
 Key: diamond, a decision made by the server (class) or by the plugin you installed (variant);
@@ -182,10 +186,10 @@ rectangle, the surface a session is offered.
   The run tools take only a run's workflow and label, or a step's or check's address handed over by
   a run's own next action. No authoring, deletion, move, people or agent tool is served to a pinned
   credential: calling one is the refusal for a tool that does not exist.
-- **Interactive** (human) credentials are offered all **thirty-seven** tools (the eight plus every
-  node, workflow, people, agent, connection and trigger tool). Every tool but `start_run` has a
+- **Interactive** (human) credentials are offered all **thirty-nine** tools (the eight plus every
+  node, workflow, run, people, agent, connection and trigger tool). Every tool but `start_run` has a
   typed slash prompt taking one whole-string argument, and the composite prompt **`work-run`**
-  covers `start_run`: thirty-seven prompts. Prompts are never offered to a pinned credential.
+  covers `start_run`: thirty-nine prompts. Prompts are never offered to a pinned credential.
 - **Large context is chunked and paged for you on the human surface**; a pinned session receives
   its payload whole. The tool descriptions and prompts carry the exact rules. What each tool does,
   and how confirm tokens, the run lease, the context token, run holds and non-composing reads work,
@@ -272,10 +276,10 @@ Run once, in any session:
 - the wildcard `mcp__plugin_alynki_alynki__*` to `permissions.allow`, covering every Alynki tool
   including ones added later (the `plugin_alynki_alynki` segment is exact, so it can only match
   Alynki's own server);
-- six exact-name rules to `permissions.ask`, so the tools that change who has access or create a
-  credential still prompt before every call: `grant_principal`, `revoke_principal`,
-  `invite_principal`, `revoke_principal_invite`, `create_principal_agent` and
-  `revoke_principal_agent`.
+- seven exact-name rules to `permissions.ask`, so the tools that change who has access or manage the
+  agents that act in an organisation still prompt before every call: `grant_principal`,
+  `revoke_principal`, `invite_principal`, `revoke_principal_invite`, `create_principal_agent`,
+  `update_principal_agent` and `revoke_principal_agent`.
 
 ```mermaid
 ---
@@ -284,7 +288,7 @@ title: How a call to an Alynki tool is decided after setup
 graph TB
   req["A call to an Alynki tool"]
   deny{"A deny rule matches?"}
-  ask{"An ask rule matches? Exactly the six gated tools"}
+  ask{"An ask rule matches? Exactly the seven gated tools"}
   allow{"The allow wildcard matches?"}
   refused["Refused"]
   prompt["Prompts before the call: no permission mode auto-approves it"]
@@ -302,16 +306,16 @@ graph TB
 
 Key: diamond, a rule check in Claude Code's fixed order; rectangle, the outcome.
 
-Re-running the command adds any rule that is missing and changes nothing else. ⚠️ The gate lives in
-this client: a non-interactive
-`-p` run without `--permission-prompt-tool` cannot answer the prompt, `dontAsk` denies these calls,
-and another MCP client may not prompt at all.
+Re-running the command adds any rule that is missing, on a machine set up before that rule existed
+too, and changes nothing else. ⚠️ The gate lives in this client: a non-interactive `-p` run without
+`--permission-prompt-tool` cannot answer the prompt, `dontAsk` denies these calls, and another MCP
+client may not prompt at all.
 
 ⚠️ **This command still prompts once, for its own write.** `~/.claude` is a protected path, so no
 allow rule suppresses that prompt. It removes every *subsequent* Alynki prompt, not its own.
 
 To grant it by hand, add to `~/.claude/settings.json` (substitute `plugin_alynki-sealed_alynki` for
-the sealed variant, in all seven entries), keeping existing entries:
+the sealed variant, in all eight entries), keeping existing entries:
 
 ```json
 {
@@ -325,11 +329,20 @@ the sealed variant, in all seven entries), keeping existing entries:
       "mcp__plugin_alynki_alynki__invite_principal",
       "mcp__plugin_alynki_alynki__revoke_principal_invite",
       "mcp__plugin_alynki_alynki__create_principal_agent",
+      "mcp__plugin_alynki_alynki__update_principal_agent",
       "mcp__plugin_alynki_alynki__revoke_principal_agent"
     ]
   }
 }
 ```
+
+## Release notes
+
+- `alynki` 0.23.0 and `alynki-sealed` 0.19.0: `/alynki:setup` also asks before
+  `update_principal_agent`, so seven tools ask; re-run it on a machine set up earlier to add the
+  rule. The pinned-token text offers only an operator-issued token, since the app no longer reveals
+  agent tokens. The tool counts follow the server's 39 tools. As for every sealed version, reinstall
+  `alynki-local`.
 
 ## Status
 
