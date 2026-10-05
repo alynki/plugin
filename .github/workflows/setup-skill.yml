@@ -1,0 +1,18 @@
+# The ask rules of /alynki:setup, asserted (alynki/alynki#1433). The floor is the
+# real number of assertions in scripts/check-setup-skill.sh: raise it with the
+# assertions added, never lower it.
+name: setup-skill
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  setup-skill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The setup skill's ask rules, both variants and the README
+        env:
+          SETUP_CHECK_FLOOR: "28"
+        run: scripts/check-setup-skill.sh
