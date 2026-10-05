@@ -153,6 +153,32 @@ Non-interactive form:
 claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --config key=<key> --config key_id=<key-id>
 ```
 
+## Environment variables
+
+Every variable the plugins and `alynki-local` read, and where:
+
+- `ALYNKI_URL`: the hosted MCP endpoint, `https://mcp.alynki.com/mcp` (a URL with a tenant path
+  segment is refused). `alynki-local` reads it at startup and in `alynki-local login` and
+  `alynki-local logout`, each of which fails without it. The sealed plugin's `.mcp.json` sets it for
+  the session; **a terminal command needs it set in your shell**:
+  `ALYNKI_URL=https://mcp.alynki.com/mcp alynki-local login`.
+- `ALYNKI_AUTH_URL`: the authorization server used to sign in, `https://auth.alynki.com` when unset.
+  `alynki-local` reads it in `login`, `logout` and when it refreshes a stored login.
+- `ALYNKI_TOKEN`: a pinned token. `alynki-local` reads it at startup; when set it wins over a stored
+  login. The sealed plugin's `.mcp.json` fills it from the plugin's token field.
+- `ALYNKI_KEY` and `ALYNKI_KEY_ID`: the organisation key and its id, both or neither.
+  `alynki-local` reads them at startup, in `alynki-local key import` (which stores them) and in
+  `alynki-local seal`; when set they override the stored key. The sealed plugin's `.mcp.json` fills
+  them from the plugin's key fields.
+- `CLAUDE_CONFIG_DIR`: where Claude Code keeps `settings.json`. The standard plugin's
+  `bin/headers.sh` reads the pinned token from `$CLAUDE_CONFIG_DIR/settings.json`, and from
+  `~/.claude/settings.json` when it is unset.
+- `CLAUDE_PLUGIN_ROOT`: set by Claude Code to the installed plugin's directory; the standard
+  plugin's `.mcp.json` uses it to locate `bin/headers.sh`.
+
+`alynki-local` keeps its stored login and key in the `alynki` directory under your operating
+system's user configuration directory (the OS keychain first, with a file fallback).
+
 ## What it installs
 
 ```mermaid
@@ -197,9 +223,12 @@ rectangle, the surface a session is offered.
   `docs/architecture/tool-descriptions.md`.
 - The standard connection goes straight to the hosted server. The sealed one goes to `alynki-local`,
   which calls the hosted server, decrypts the result, and does the chunking and paging on this
-  machine, so the hosted service sees only whole ciphertext. **The run surface above is the
-  standard variant's**: Alynki serves runs to unsealed organisations only, so `alynki-local`
-  mirrors none of it.
+  machine, so the hosted service sees only whole ciphertext. **`alynki-local` mirrors the run
+  tools of an interactive credential, except `start_run`**: `load_run`, `load_step`, `load_check`,
+  `save_run`, `save_check` (it decrypts what you read and encrypts what you write), `create_run`
+  and `release_run`, plus `list_runs` and `delete_run`. It does **not** mirror `start_run`, nor the
+  `work-run` prompt that calls it: starting a run, and the run lease, controller and agents built
+  on it, serve unsealed organisations only.
 - `SessionStart` and `SubagentStart` hooks that instruct every session, and every subagent, to call
   `load_context` first (`SessionStart` emits both `initialUserMessage` and `additionalContext`;
   `SubagentStart` emits `additionalContext`). The text names only `load_context`, which every

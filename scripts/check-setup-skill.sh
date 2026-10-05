@@ -38,6 +38,7 @@ absent_word() { ! grep -qiw -- "$1" "$2"; }
 gate_size() { [ "$(grep -cE '^- `[a-z_]+`$' "$1")" -eq "$2" ]; }
 in_readme_json() { grep -qF "\"mcp__plugin_alynki_alynki__$1\"" README.md; }
 not_in_readme_json() { ! grep -qF "mcp__plugin_alynki_alynki__$1" README.md; }
+in_readme_all() { for t in "$@"; do grep -qF "\`$t\`" README.md || return 1; done; }
 named_in_readme() { grep -qF "\`$1\` $2" README.md; }
 
 ok "the two setup skills are byte-identical" cmp -s "$SKILL" "$SEALED"
@@ -64,6 +65,11 @@ ok "the standard plugin's hooks do not offer a revealed agent token" absent 'you
 
 ok "the README names the standard plugin's version" named_in_readme alynki "$(jq -r .version "$STD")"
 ok "the README names the sealed plugin's version" named_in_readme alynki-sealed "$(jq -r .version "$SLD")"
+
+ok "the README does not say the sealed proxy mirrors none of the run surface" absent 'mirrors none of it' README.md
+ok "the README names the run tools the sealed proxy mirrors" in_readme_all load_run load_step load_check save_run save_check create_run release_run
+ok "the README names ALYNKI_AUTH_URL" grep -qF 'ALYNKI_AUTH_URL' README.md
+ok "the README names CLAUDE_CONFIG_DIR, which headers.sh reads" grep -qF 'CLAUDE_CONFIG_DIR' README.md
 
 echo "$n assertions, $failed failed"
 [ "$failed" -eq 0 ] || exit 1
