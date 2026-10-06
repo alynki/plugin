@@ -208,16 +208,17 @@ rectangle, the surface a session is offered.
 - **Pinned** (agent) credentials, including one working a run unattended, are offered exactly
   **eight tools**: `load_context`, `save_context`, `start_run`, `load_run`, `load_step`,
   `load_check`, `save_run` and `save_check`. `load_context` and `save_context` take **no address
-  argument**: scope comes entirely from the token, so an injected instruction cannot redirect it.
-  The run tools take only a run's workflow and label, or a step's or check's address handed over by
-  a run's own next action. No authoring, deletion, move, people or agent tool is served to a pinned
+  argument**: scope comes entirely from the token. The run tools take only a run's workflow and
+  label, or a step's or check's address handed over by a run's own next action. No authoring, deletion, move, people or agent tool is served to a pinned
   credential: calling one is the refusal for a tool that does not exist.
 - **Interactive** (human) credentials are offered all **thirty-nine** tools (the eight plus every
   node, workflow, run, people, agent, connection and trigger tool). Every tool but `start_run` has a
   typed slash prompt taking one whole-string argument, and the composite prompt **`work-run`**
   covers `start_run`: thirty-nine prompts. Prompts are never offered to a pinned credential.
-- **Large context is chunked and paged for you on the human surface**; a pinned session receives
-  its payload whole. The tool descriptions and prompts carry the exact rules. What each tool does,
+- **Large context is paged** in 25 KiB pages: both credential classes read it with the optional
+  `cursor` of `load_context`, `load_step` and `load_check`. Only an interactive session saves a large
+  body in staged chunks (`mode` `stage`, then `commit`); a pinned `save_context` has no staged mode
+  and takes the body whole. The tool descriptions and prompts carry the exact rules. What each tool does,
   and how confirm tokens, the run lease, the context token, run holds and non-composing reads work,
   is the server's contract: see `alynki/alynki` `docs/architecture/run-continuation.md` and
   `docs/architecture/tool-descriptions.md`.
