@@ -227,10 +227,12 @@ jobs:
           }
 
           # uses_closes TEXT -> 0 iff TEXT closes something: a closing keyword (close, closes,
-          # closed, fix, fixes, fixed, resolve, resolves, resolved; any case, an optional colon)
-          # followed by an issue reference: #N, owner/repo#N, GH-N or an issue URL.
+          # closed, fix, fixes, fixed, resolve, resolves, resolved; any case) followed by an issue
+          # reference: #N, owner/repo#N, GH-N or an issue URL (http or https). Markdown emphasis
+          # around the keyword or the reference (**Closes** #1, Closes: **#1**), a colon, and a
+          # line break between the two do not hide it: newlines are read as spaces.
           uses_closes() {
-            printf '%s\n' "$1" | grep -qiE '(^|[^A-Za-z0-9_])(close[sd]?|fix(e[sd])?|resolve[sd]?):?[[:space:]]+(([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+|GH-[0-9]+|https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/[0-9]+)'
+            printf '%s' "$1" | tr '\n\r' '  ' | grep -qiE '(^|[^A-Za-z0-9_])(close[sd]?|fix(e[sd])?|resolve[sd]?)[*_]*(:[*_]*[[:space:]]*|[[:space:]]+)[*_]*(([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+|GH-[0-9]+|https?://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/[0-9]+)'
           }
 
           # ---- the sub-issue and label rules ----
@@ -299,16 +301,17 @@ jobs:
 
           # skippable_merge COMMIT_JSON LISTED_SHAS -> 0 iff the merge commit is what "update
           # branch" or `git merge main` makes: exactly two parents, one an ancestor of the base
-          # (the base branch's side), the other either in the PR's own history (the listed
-          # commits) or itself an ancestor of the base (a branch that has only just left it).
+          # (the base branch's side) and the other a commit of the PR's own listed commits (the
+          # branch's side). Two commits of the base, or any parent from outside the branch, is not
+          # an update and is judged.
           skippable_merge() {
             local c="$1" listed="$2" n a b
             n=$(jq -r '.parents | length' <<<"$c")
             [ "$n" -eq 2 ] || return 1
             a=$(jq -r '.parents[0]' <<<"$c")
             b=$(jq -r '.parents[1]' <<<"$c")
-            if is_base_ancestor "$b" && { grep -qxF "$a" <<<"$listed" || is_base_ancestor "$a"; }; then return 0; fi
-            if is_base_ancestor "$a" && { grep -qxF "$b" <<<"$listed" || is_base_ancestor "$b"; }; then return 0; fi
+            if grep -qxF "$a" <<<"$listed" && is_base_ancestor "$b"; then return 0; fi
+            if grep -qxF "$b" <<<"$listed" && is_base_ancestor "$a"; then return 0; fi
             return 1
           }
 
@@ -417,7 +420,7 @@ jobs:
               return 1
             fi
             files=$(GH_TOKEN="$GITHUB_TOKEN" gh api --paginate "repos/$OWN_REPO/pulls/$PR_NUMBER/files" \
-              --jq '.[] | {filename, patch: (.patch // "")}' 2>/dev/null | jq -s -c '.') || files=""
+              --jq '.[] | {filename, status: (.status // ""), previous_filename: (.previous_filename // ""), patch: (.patch // "")}' 2>/dev/null | jq -s -c '.') || files=""
             if [ -z "$files" ]; then
               err "the files of the image-pin PR could not be read; refusing to pass"
               return 1
@@ -425,6 +428,10 @@ jobs:
             n=$(jq 'length' <<<"$files")
             if [ "$n" -ne 1 ] || [ "$(jq -r '.[0].filename' <<<"$files")" != "cloudrun.tf" ]; then
               err "an image-pin PR must change exactly cloudrun.tf and nothing else, but this PR changes $n file(s) — put every other change in a work/ PR into a release branch"
+              return 1
+            fi
+            if [ "$(jq -r '.[0].status' <<<"$files")" = renamed ] || [ -n "$(jq -r '.[0].previous_filename' <<<"$files")" ]; then
+              err "cloudrun.tf was renamed or moved in this PR; an image-pin PR changes the digest lines of the existing cloudrun.tf and nothing else"
               return 1
             fi
             patch=$(jq -r '.[0].patch' <<<"$files")
