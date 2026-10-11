@@ -37,7 +37,8 @@ jobs:
       # release-branch-flow.md §9.1 F15: wave 1 is built under today's rules
       # until the first ruleset apply, alynki/alynki#1616). "false" keeps
       # today's rules for a PR into main from a branch that is not work/** or
-      # release/** (and keeps the dependabot/** exemption). The ruleset-apply
+      # release/** (and keeps the dependabot/** and typed-client/** exemptions,
+      # which the server's typed-client workflow still needs). The ruleset-apply
       # task sets it to "true"; a PR into release/** is judged by the flow's
       # rules either way. This env sits under `jobs:` so the plugin copy
       # mirrors it.
@@ -45,17 +46,17 @@ jobs:
     steps:
       # Checked before any credential step, by branch name AND the bot that
       # opened the PR (a name alone could be spoofed by anyone who can push a
-      # branch): dependabot/** from dependabot[bot], and only until the flow is
-      # in force. The typed-client/** exemption is gone: the typed-client PR is
-      # the run's own work/ PR. An exempt PR mints nothing and passes immediately.
-      - name: Exempt Dependabot PRs until the flow is in force (branch and author)
+      # branch): dependabot/** from dependabot[bot], typed-client/** from the
+      # alynki-ci App, and only until the flow is in force. An exempt PR mints
+      # nothing and passes immediately.
+      - name: Exempt Dependabot and typed-client PRs until the flow is in force (branch and author)
         id: exempt
         env:
           BRANCH: ${{ github.event.pull_request.head.ref }}
           AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           case "$FLOW_IN_FORCE:$BRANCH:$AUTHOR" in
-            "false:dependabot/"*":dependabot[bot]") exempt=true ;;
+            "false:dependabot/"*":dependabot[bot]"|"false:typed-client/"*":alynki-ci[bot]") exempt=true ;;
             *) exempt=false ;;
           esac
           echo "exempt=$exempt" >> "$GITHUB_OUTPUT"
