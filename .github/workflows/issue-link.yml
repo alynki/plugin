@@ -16,7 +16,7 @@ name: issue-link
 
 on:
   pull_request:
-    types: [opened, edited, synchronize, reopened, ready_for_review]
+    types: [opened, edited, synchronize, reopened, ready_for_review, labeled, unlabeled]
 
 permissions:
   contents: read
@@ -226,10 +226,13 @@ jobs:
             [ -n "$rest" ] && resolves_any "$rest"
           }
 
-          # uses_closes TEXT -> 0 iff TEXT closes something: the word Closes (any case, an
-          # optional colon) followed by an issue reference.
+          # uses_closes TEXT -> 0 iff TEXT closes something: a closing keyword (close, closes,
+          # closed, fix, fixes, fixed, resolve, resolves, resolved; any case) followed by an issue
+          # reference: #N, owner/repo#N, GH-N or an issue URL (http or https). Markdown emphasis
+          # around the keyword or the reference (**Closes** #1, Closes: **#1**), a colon, and a
+          # line break between the two do not hide it: newlines are read as spaces.
           uses_closes() {
-            printf '%s\n' "$1" | grep -qiE '(^|[^A-Za-z0-9_])closes:?[[:space:]]+([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+'
+            printf '%s' "$1" | tr '\n\r' '  ' | grep -qiE '(^|[^A-Za-z0-9_])(close[sd]?|fix(e[sd])?|resolve[sd]?)[*_]*(:[*_]*[[:space:]]*|[[:space:]]+)[*_]*(([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+|GH-[0-9]+|https?://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/[0-9]+)'
           }
 
           # ---- the sub-issue and label rules ----
@@ -276,24 +279,61 @@ jobs:
 
           # ---- commits ----
           # Fetched once. The count of commits seen and checked is what makes the check fail
-          # closed: a PR always has a commit, so none means the listing failed.
+          # closed: a PR always has a commit, so none means the listing failed. The PR's own
+          # commit count and head repository come from the Pulls API (pr_info).
           commits_json=$(GH_TOKEN="$GITHUB_TOKEN" gh api --paginate "repos/$OWN_REPO/pulls/$PR_NUMBER/commits" \
-            --jq '.[] | {sha, message: .commit.message, parents: (.parents | length)}' | jq -s -c '.[]')
+            --jq '.[] | {sha, message: .commit.message, parents: [.parents[].sha]}' | jq -s -c '.[]')
+          pr_info=$(GH_TOKEN="$GITHUB_TOKEN" gh api "repos/$OWN_REPO/pulls/$PR_NUMBER" \
+            --jq '"\(.commits) \(.head.repo.full_name // "")"' 2>/dev/null) || pr_info=""
+          pr_commit_count="${pr_info%% *}"
+          pr_head_repo="${pr_info#* }"
+
+          # is_base_ancestor SHA -> 0 iff SHA is an ancestor of the base branch (compare says the
+          # base is ahead of it, or the same). The base is only ever main or a validated release
+          # branch here; nothing else reaches the API path.
+          is_base_ancestor() {
+            local status
+            [[ "$BASE" =~ ^(main|release/[0-9]+-[a-z0-9-]+)$ ]] || return 1
+            [[ "$1" =~ ^[0-9a-f]{40}$ ]] || return 1
+            status=$(GH_TOKEN="$GITHUB_TOKEN" gh api "repos/$OWN_REPO/compare/$BASE...$1" --jq .status 2>/dev/null) || return 1
+            [ "$status" = behind ] || [ "$status" = identical ]
+          }
+
+          # skippable_merge COMMIT_JSON LISTED_SHAS -> 0 iff the merge commit is what "update
+          # branch" or `git merge main` makes: exactly two parents, one an ancestor of the base
+          # (the base branch's side) and the other a commit of the PR's own listed commits (the
+          # branch's side). Two commits of the base, or any parent from outside the branch, is not
+          # an update and is judged.
+          skippable_merge() {
+            local c="$1" listed="$2" n a b
+            n=$(jq -r '.parents | length' <<<"$c")
+            [ "$n" -eq 2 ] || return 1
+            a=$(jq -r '.parents[0]' <<<"$c")
+            b=$(jq -r '.parents[1]' <<<"$c")
+            if grep -qxF "$a" <<<"$listed" && is_base_ancestor "$b"; then return 0; fi
+            if grep -qxF "$b" <<<"$listed" && is_base_ancestor "$a"; then return 0; fi
+            return 1
+          }
 
           # check_commits RULE -> RULE is `names` (today: a commit names an existing issue) or
           # `refs` (the flow: a non-merge commit carries Refs to one, and no commit closes).
-          # A merge commit (two parents) is skipped for the naming rule: "Update branch"
-          # writes "Merge branch 'main' into …", which names no issue, and a squash merge
-          # drops it anyway.
+          # Under `names` a merge commit (two or more parents) is skipped: "Update branch" writes
+          # "Merge branch 'main' into …", which names no issue, and a squash merge drops it
+          # anyway. Under `refs` only a skippable_merge is skipped, any other merge is a failure,
+          # and the listing must be complete (equal to the PR's commit count, at most 250).
           check_commits() {
-            local rule="$1" c sha msg seen=0 checked=0 bad=() closing=()
+            local rule="$1" c sha msg seen=0 checked=0 listed bad=() closing=() badmerge=()
+            listed=$(jq -r '.sha' <<<"$commits_json")
             while IFS= read -r c; do
               [ -n "$c" ] || continue
               seen=$((seen + 1))
               sha=$(jq -r '.sha' <<<"$c")
               msg=$(jq -r '.message' <<<"$c")
               if [ "$rule" = refs ] && uses_closes "$msg"; then closing+=("${sha:0:7}"); fi
-              [ "$(jq -r '.parents // 1' <<<"$c")" -gt 1 ] && continue
+              if [ "$(jq -r '.parents | length' <<<"$c")" -gt 1 ]; then
+                if [ "$rule" = refs ] && ! skippable_merge "$c" "$listed"; then badmerge+=("${sha:0:7}"); fi
+                continue
+              fi
               checked=$((checked + 1))
               if [ "$rule" = refs ]; then
                 carries_refs "$msg" || bad+=("${sha:0:7}")
@@ -305,6 +345,15 @@ jobs:
             [ "$seen" -gt 0 ] || err "the PR's commit list came back empty; refusing to pass"
             # A PR of merge commits only would pass vacuously: at least one commit must be checked.
             [ "$seen" -eq 0 ] || [ "$checked" -gt 0 ] || err "every commit is a merge commit; at least one must reference an issue"
+            if [ "$rule" = refs ]; then
+              if ! [[ "$pr_commit_count" =~ ^[0-9]+$ ]]; then
+                err "the PR's commit count could not be read; refusing to pass on a commit list that cannot be checked for completeness"
+              elif [ "$pr_commit_count" -gt 250 ]; then
+                err "the PR has $pr_commit_count commits and the commit listing stops at 250, so the commits cannot all be checked — split the release"
+              elif [ "$seen" -ne "$pr_commit_count" ]; then
+                err "the commit listing has $seen commits but the PR has $pr_commit_count — the list is incomplete, refusing to pass"
+              fi
+            fi
             if [ "${#bad[@]}" -gt 0 ]; then
               if [ "$rule" = refs ]; then
                 err "commit(s) carry no Refs to an existing issue: ${bad[*]} — end the commit message with 'Refs owner/repo#N'"
@@ -312,8 +361,11 @@ jobs:
                 err "commit(s) name no existing issue: ${bad[*]}"
               fi
             fi
+            if [ "${#badmerge[@]}" -gt 0 ]; then
+              err "merge commit(s) ${badmerge[*]} are not an update from the base branch (exactly two parents: the base's history and the branch's) — merge only $BASE into the branch, nothing else"
+            fi
             if [ "${#closing[@]}" -gt 0 ]; then
-              err "commit(s) use Closes: ${closing[*]} — no PR closes anything, write 'Refs' instead; the close-out step closes the issues"
+              err "commit(s) use a closing keyword: ${closing[*]} — no PR closes anything, write 'Refs' instead; the close-out step closes the issues"
             fi
           }
 
@@ -356,15 +408,68 @@ jobs:
             return 0
           }
 
+          # image_pin_ok -> 0 iff this PR changes exactly cloudrun.tf, and in it only the
+          # @sha256: digests (every removed line has an added twin that differs from it by a
+          # digest alone, so an image name, a flag or another line changing fails), and its head
+          # is a branch of this repository, not a fork's. On 1 it has printed each reason as an
+          # error.
+          image_pin_ok() {
+            local files n patch removed added
+            if [ "$pr_head_repo" != "$OWN_REPO" ]; then
+              err "an image-pin PR must come from a branch of $OWN_REPO, not a fork — push the work/{issue#}-pin-… branch to $OWN_REPO"
+              return 1
+            fi
+            files=$(GH_TOKEN="$GITHUB_TOKEN" gh api --paginate "repos/$OWN_REPO/pulls/$PR_NUMBER/files" \
+              --jq '.[] | {filename, status: (.status // ""), previous_filename: (.previous_filename // ""), patch: (.patch // "")}' 2>/dev/null | jq -s -c '.') || files=""
+            if [ -z "$files" ]; then
+              err "the files of the image-pin PR could not be read; refusing to pass"
+              return 1
+            fi
+            n=$(jq 'length' <<<"$files")
+            if [ "$n" -ne 1 ] || [ "$(jq -r '.[0].filename' <<<"$files")" != "cloudrun.tf" ]; then
+              err "an image-pin PR must change exactly cloudrun.tf and nothing else, but this PR changes $n file(s) — put every other change in a work/ PR into a release branch"
+              return 1
+            fi
+            if [ "$(jq -r '.[0].status' <<<"$files")" = renamed ] || [ -n "$(jq -r '.[0].previous_filename' <<<"$files")" ]; then
+              err "cloudrun.tf was renamed or moved in this PR; an image-pin PR changes the digest lines of the existing cloudrun.tf and nothing else"
+              return 1
+            fi
+            patch=$(jq -r '.[0].patch' <<<"$files")
+            if [ -z "$patch" ]; then
+              err "cloudrun.tf has no patch to read (too large, or only renamed); an image-pin PR must be a few digest lines"
+              return 1
+            fi
+            removed=$(printf '%s\n' "$patch" | grep -E '^-' | sed -E 's/^-//; s/@sha256:[0-9a-f]{64}/@sha256:DIGEST/' | LC_ALL=C sort || true)
+            added=$(printf '%s\n' "$patch" | grep -E '^\+' | sed -E 's/^\+//; s/@sha256:[0-9a-f]{64}/@sha256:DIGEST/' | LC_ALL=C sort || true)
+            if ! printf '%s\n%s\n' "$removed" "$added" | grep -q '@sha256:DIGEST'; then
+              err "an image-pin PR must change @sha256: digest lines in cloudrun.tf, and this one changes none"
+              return 1
+            fi
+            if [ "$removed" != "$added" ]; then
+              err "an image-pin PR may change only the @sha256: digests in cloudrun.tf; another part of a changed line differs (an image name, a flag or another line) — move that change to a work/ PR"
+              return 1
+            fi
+            return 0
+          }
+
           flow_check() {
             local w f wrepo frepo
+            # BRANCH and BASE are untrusted PR text. They reach this script only through env:, and
+            # nothing is derived from them (an API path, a number) until they are known to be a
+            # plain ref name; a name that is not one is refused WITHOUT being echoed.
+            if ! [[ "$BRANCH" =~ ^[A-Za-z0-9._/-]{1,200}$ ]] || ! [[ "$BASE" =~ ^[A-Za-z0-9._/-]{1,200}$ ]]; then
+              err "the head or base branch name has characters outside A-Z a-z 0-9 . _ / - ; a branch name must be work/{issue#}-{slug} (head) into release/{feature#}-{slug} or main"
+              return 0
+            fi
             if [ "$BASE" = "main" ]; then
               if [[ "$BRANCH" =~ ^release/([0-9]+)-[a-z0-9-]+$ ]]; then
                 feature_ok "${BASH_REMATCH[1]}" || true
-              elif [ "$OWN_REPO" = "alynki/gcp-infrastructure" ] && [[ "$BRANCH" =~ ^work/([0-9]+)-[a-z0-9-]+$ ]] && pr_has_label image-pin; then
-                # The one exception to "main only from release/**": an image-pin PR.
+              elif [ "$OWN_REPO" = "alynki/gcp-infrastructure" ] && [[ "$BRANCH" =~ ^work/([0-9]+)-pin-[a-z0-9-]+$ ]] && pr_has_label image-pin; then
+                # The one exception to "main only from release/**": an image-pin PR, narrowed
+                # to a branch of this repository that changes nothing but cloudrun.tf digests.
                 w="${BASH_REMATCH[1]}"
                 resolve_bare "$w" || err "branch '$BRANCH' names issue #$w, which does not resolve to an existing issue in $OWN_REPO or alynki/alynki"
+                image_pin_ok || true
               else
                 err "a PR into main must come from release/{feature#}-{slug}, not '$BRANCH' — open the PR from the release branch of the feature (labelled release); only an image-pin PR on gcp-infrastructure from work/{issue#}-pin-… may go to main directly"
               fi
@@ -397,7 +502,7 @@ jobs:
             # Refs on the PR (title or body) and on every non-merge commit; no PR closes anything.
             carries_refs "$TITLE"$'\n'"${BODY:-}" || err "the PR carries no Refs to an existing issue — write 'Refs owner/repo#N' in the PR body"
             if uses_closes "$TITLE"$'\n'"${BODY:-}"; then
-              err "the PR uses Closes — no PR closes anything, write 'Refs' instead; the close-out step closes the issues"
+              err "the PR uses a closing keyword (Closes, Fixes, Resolves) — no PR closes anything, write 'Refs' instead; the close-out step closes the issues"
             fi
             check_commits refs
             if [ "$fail" -eq 0 ]; then
