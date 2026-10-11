@@ -32,19 +32,30 @@ jobs:
       issues: read
       pull-requests: read
       id-token: write
+    env:
+      # Whether the release-branch flow is in force (alynki/alynki#1611;
+      # release-branch-flow.md §9.1 F15: wave 1 is built under today's rules
+      # until the first ruleset apply, alynki/alynki#1616). "false" keeps
+      # today's rules for a PR into main from a branch that is not work/** or
+      # release/** (and keeps the dependabot/** exemption). The ruleset-apply
+      # task sets it to "true"; a PR into release/** is judged by the flow's
+      # rules either way. This env sits under `jobs:` so the plugin copy
+      # mirrors it.
+      FLOW_IN_FORCE: "false"
     steps:
       # Checked before any credential step, by branch name AND the bot that
       # opened the PR (a name alone could be spoofed by anyone who can push a
-      # branch): dependabot/** from dependabot[bot], typed-client/** from the
-      # alynki-ci App. An exempt PR mints nothing and passes immediately.
-      - name: Exempt Dependabot and typed-client PRs (branch and author)
+      # branch): dependabot/** from dependabot[bot], and only until the flow is
+      # in force. The typed-client/** exemption is gone: the typed-client PR is
+      # the run's own work/ PR. An exempt PR mints nothing and passes immediately.
+      - name: Exempt Dependabot PRs until the flow is in force (branch and author)
         id: exempt
         env:
           BRANCH: ${{ github.event.pull_request.head.ref }}
           AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
-          case "$BRANCH:$AUTHOR" in
-            "dependabot/"*":dependabot[bot]"|"typed-client/"*":alynki-ci[bot]") exempt=true ;;
+          case "$FLOW_IN_FORCE:$BRANCH:$AUTHOR" in
+            "false:dependabot/"*":dependabot[bot]") exempt=true ;;
             *) exempt=false ;;
           esac
           echo "exempt=$exempt" >> "$GITHUB_OUTPUT"
@@ -104,17 +115,21 @@ jobs:
             echo "GOOGLE_CLOUD_PROJECT="
           } >> "$GITHUB_ENV"
 
-      # Untrusted text (the branch name, the PR title) reaches the script
-      # only through env:, never interpolated into this run: block — GitHub's
-      # security-hardening guide's "preferred approach to handling untrusted
-      # input". The commit messages are fetched by the script itself, inside
-      # the process, from the paginated Pulls API — never placed in `${{ }}`
-      # at all.
+      # Untrusted text (the branch names, the PR title and body) reaches the
+      # script only through env:, never interpolated into this run: block —
+      # GitHub's security-hardening guide's "preferred approach to handling
+      # untrusted input". The commit messages are fetched by the script itself,
+      # inside the process, from the paginated Pulls API — never placed in
+      # `${{ }}` at all. The run: block is the INLINED part of
+      # scripts/issue-link.sh, byte for byte (scripts/issue-link-proof/run.sh
+      # fails when the two differ).
       - name: issue-link check
         if: steps.exempt.outputs.exempt != 'true'
         env:
           BRANCH: ${{ github.event.pull_request.head.ref }}
+          BASE: ${{ github.event.pull_request.base.ref }}
           TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
           OWN_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           GITHUB_TOKEN: ${{ github.token }}
@@ -125,48 +140,60 @@ jobs:
           fail=0
           err() { echo "::error title=issue-link::$1"; fail=1; }
 
-          # gh_issue REPO NUM TOKEN -> 0 iff REPO#NUM exists and is an issue,
-          # not a PR. The Issues API returns pull requests too; the
-          # `pull_request` field is how the API tells the two apart (a PR
-          # number is not an issue).
-          gh_issue() {
+          # ---- resolution ----
+          # gh_issue_json REPO NUM TOKEN -> prints the issue's JSON, 0 iff REPO#NUM exists
+          # and is an issue, not a PR. The Issues API returns pull requests too; the
+          # `pull_request` field is how the API tells the two apart (a PR number is not an
+          # issue).
+          gh_issue_json() {
             local repo="$1" num="$2" token="$3" out
             [ -n "$token" ] || return 1
             out=$(GH_TOKEN="$token" gh api "repos/$repo/issues/$num" 2>/dev/null) || return 1
-            ! printf '%s' "$out" | jq -e 'has("pull_request")' >/dev/null 2>&1
+            if printf '%s' "$out" | jq -e 'has("pull_request")' >/dev/null 2>&1; then return 1; fi
+            printf '%s' "$out"
           }
+          gh_issue() { gh_issue_json "$1" "$2" "$3" >/dev/null; }
 
-          # resolve_bare NUM -> 0 iff NUM names an existing issue: OWN_REPO
-          # first (GITHUB_TOKEN), then alynki/alynki (ALYNKI_TOKEN).
-          resolve_bare() {
-            local num="$1"
-            gh_issue "$OWN_REPO" "$num" "$GITHUB_TOKEN" && return 0
-            gh_issue "alynki/alynki" "$num" "$ALYNKI_TOKEN" && return 0
-            return 1
-          }
-
-          # resolve_scoped REPO NUM -> 0 iff REPO#NUM resolves with a token
-          # this job holds. Only OWN_REPO and alynki/alynki are reachable; a
-          # reference naming any other repository cannot resolve here.
-          resolve_scoped() {
-            local repo="$1" num="$2"
-            case "$repo" in
-              "$OWN_REPO")     gh_issue "$repo" "$num" "$GITHUB_TOKEN" ;;
-              "alynki/alynki") gh_issue "$repo" "$num" "$ALYNKI_TOKEN" ;;
-              *)               return 1 ;;
+          # token_for REPO -> the token this job holds for REPO: OWN_REPO (GITHUB_TOKEN) or
+          # alynki/alynki (the narrowed ALYNKI_TOKEN); nothing for any other repository.
+          token_for() {
+            case "$1" in
+              "$OWN_REPO")     printf '%s' "$GITHUB_TOKEN" ;;
+              "alynki/alynki") printf '%s' "${ALYNKI_TOKEN:-}" ;;
+              *)               printf '' ;;
             esac
           }
 
-          # extract_refs TEXT -> one reference per line: "owner/repo#N" or
-          # "#N". Scoped matches first, then bare "#N" on the text with every
-          # scoped match blanked out, so a scoped reference's own number is
-          # never double counted as a second, bare reference.
+          # locate_issue NUM -> prints the repository NUM is an issue in: OWN_REPO first
+          # (with GITHUB_TOKEN), then alynki/alynki (with the narrowed ALYNKI_TOKEN).
+          locate_issue() {
+            local num="$1"
+            if gh_issue "$OWN_REPO" "$num" "$GITHUB_TOKEN"; then echo "$OWN_REPO"; return 0; fi
+            if gh_issue "alynki/alynki" "$num" "${ALYNKI_TOKEN:-}"; then echo "alynki/alynki"; return 0; fi
+            return 1
+          }
+
+          # resolve_bare NUM -> 0 iff NUM names an existing issue (see locate_issue).
+          resolve_bare() { locate_issue "$1" >/dev/null; }
+
+          # resolve_scoped REPO NUM -> 0 iff REPO#NUM resolves with a token this job
+          # holds. Only OWN_REPO and alynki/alynki are reachable; a reference naming any
+          # other repository cannot resolve here.
+          resolve_scoped() {
+            local repo="$1" num="$2"
+            gh_issue "$repo" "$num" "$(token_for "$repo")"
+          }
+
+          # extract_refs TEXT -> one reference per line: "owner/repo#N" or "#N".
+          # Scoped matches first, then bare "#N" on the text with every scoped match
+          # blanked out first, so a scoped reference's own number is never double
+          # counted as a second, bare reference.
           extract_refs() {
             local text="$1" scoped stripped bare
             scoped=$(printf '%s' "$text" | grep -oE '[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+' || true)
             stripped=$(printf '%s' "$text" | sed -E 's|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+||g')
-            # A bare #N counts only at the start or after a non-word character,
-            # so abc#12 is not a reference to #12.
+            # A bare #N counts only at the start or after a non-word character, so
+            # abc#12 is not a reference to #12.
             bare=$(printf '%s' "$stripped" | grep -oE '(^|[^A-Za-z0-9_])#[0-9]+' | grep -oE '#[0-9]+' || true)
             { [ -n "$scoped" ] && printf '%s\n' "$scoped"; [ -n "$bare" ] && printf '%s\n' "$bare"; } || true
           }
@@ -187,50 +214,205 @@ jobs:
             return 1
           }
 
-          # ---- 1. branch name ----
-          if [[ ! "$BRANCH" =~ ^([0-9]+)-[a-z0-9-]+$ ]]; then
-            err "branch '$BRANCH' is not {issueNumber}-{slug} — rename the branch to issue-slug"
-          else
-            branch_num="${BASH_REMATCH[1]}"
-            if ! resolve_bare "$branch_num"; then
-              err "branch '$BRANCH' names issue #$branch_num, which does not resolve to an existing issue in $OWN_REPO or alynki/alynki"
-            fi
-          fi
+          # names_issue TEXT -> 0 iff TEXT names an existing issue (today's title/commit rule).
+          names_issue() { [ -n "$(extract_refs "$1")" ] && resolves_any "$1"; }
 
-          # ---- 2. PR title ----
-          if [ -z "$(extract_refs "$TITLE")" ] || ! resolves_any "$TITLE"; then
-            err "PR title '$TITLE' names no existing issue — name the issue in the title"
-          fi
+          # carries_refs TEXT -> 0 iff the word Refs is followed, on its line, by a reference
+          # to an existing issue ("Refs alynki/alynki#1611", "Refs: #42, #43").
+          carries_refs() {
+            local rest
+            rest=$(printf '%s\n' "$1" | grep -oiE '(^|[^A-Za-z0-9_])refs:?[[:space:]]+.*' || true)
+            [ -n "$rest" ] && resolves_any "$rest"
+          }
 
-          # ---- 3. every commit ----
+          # uses_closes TEXT -> 0 iff TEXT closes something: the word Closes (any case, an
+          # optional colon) followed by an issue reference.
+          uses_closes() {
+            printf '%s\n' "$1" | grep -qiE '(^|[^A-Za-z0-9_])closes:?[[:space:]]+([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+'
+          }
+
+          # ---- the sub-issue and label rules ----
+          # issue_has_label REPO NUM LABEL... -> 0 iff the issue carries one of the labels.
+          issue_has_label() {
+            local repo="$1" num="$2" json l
+            shift 2
+            json=$(gh_issue_json "$repo" "$num" "$(token_for "$repo")") || return 1
+            for l in "$@"; do
+              if jq -e --arg l "$l" '[.labels[]?.name] | index($l) != null' <<<"$json" >/dev/null; then return 0; fi
+            done
+            return 1
+          }
+
+          # pr_has_label LABEL -> 0 iff THIS pull request carries the label, read live from
+          # the API (the Issues API serves a PR's labels too).
+          pr_has_label() {
+            local out
+            out=$(GH_TOKEN="$GITHUB_TOKEN" gh api "repos/$OWN_REPO/issues/$PR_NUMBER" 2>/dev/null) || return 1
+            jq -e --arg l "$1" '[.labels[]?.name] | index($l) != null' <<<"$out" >/dev/null
+          }
+
+          # issue_parent REPO NUM -> prints "owner/repo number" of the issue's parent; 1 if none.
+          issue_parent() {
+            local repo="$1" num="$2" token out
+            token=$(token_for "$repo")
+            [ -n "$token" ] || return 1
+            out=$(GH_TOKEN="$token" gh api "repos/$repo/issues/$num/parent" 2>/dev/null) || return 1
+            jq -r '"\(.repository_url | sub("^.*/repos/"; "")) \(.number)"' <<<"$out"
+          }
+
+          # descends_from WREPO W FREPO F -> 0 iff W is a sub-issue of F, nested allowed
+          # (a sub-issue of a sub-issue of F counts), at most 10 levels up.
+          descends_from() {
+            local repo="$1" num="$2" frepo="$3" f="$4" depth=0 p
+            while [ "$depth" -lt 10 ]; do
+              p=$(issue_parent "$repo" "$num") || return 1
+              repo="${p% *}"; num="${p##* }"
+              if [ "$repo" = "$frepo" ] && [ "$num" = "$f" ]; then return 0; fi
+              depth=$((depth + 1))
+            done
+            return 1
+          }
+
+          # ---- commits ----
+          # Fetched once. The count of commits seen and checked is what makes the check fail
+          # closed: a PR always has a commit, so none means the listing failed.
           commits_json=$(GH_TOKEN="$GITHUB_TOKEN" gh api --paginate "repos/$OWN_REPO/pulls/$PR_NUMBER/commits" \
             --jq '.[] | {sha, message: .commit.message, parents: (.parents | length)}' | jq -s -c '.[]')
-          bad_commits=()
-          seen=0
-          checked=0
-          while IFS= read -r c; do
-            [ -n "$c" ] || continue
-            seen=$((seen + 1))
-            # A merge commit (two parents) is skipped: "Update branch" writes "Merge
-            # branch 'main' into …", which names no issue, and a squash merge drops it
-            # anyway (its title is the checked PR title or single commit's).
-            [ "$(jq -r '.parents // 1' <<<"$c")" -gt 1 ] && continue
-            checked=$((checked + 1))
-            sha=$(jq -r '.sha' <<<"$c")
-            msg=$(jq -r '.message' <<<"$c")
-            if [ -z "$(extract_refs "$msg")" ] || ! resolves_any "$msg"; then
-              bad_commits+=("${sha:0:7}")
-            fi
-          done <<<"$commits_json"
-          # Fail closed: a PR always has a commit, so none means the listing failed.
-          [ "$seen" -gt 0 ] || err "the PR's commit list came back empty; refusing to pass"
-          # A PR of merge commits only would pass vacuously: at least one commit must be checked.
-          [ "$seen" -eq 0 ] || [ "$checked" -gt 0 ] || err "every commit is a merge commit; at least one must reference an issue"
-          if [ "${#bad_commits[@]}" -gt 0 ]; then
-            err "commit(s) name no existing issue: ${bad_commits[*]}"
-          fi
 
-          if [ "$fail" -eq 0 ]; then
-            echo "issue-link: pass — branch, title and every commit reference an existing issue"
-          fi
+          # check_commits RULE -> RULE is `names` (today: a commit names an existing issue) or
+          # `refs` (the flow: a non-merge commit carries Refs to one, and no commit closes).
+          # A merge commit (two parents) is skipped for the naming rule: "Update branch"
+          # writes "Merge branch 'main' into …", which names no issue, and a squash merge
+          # drops it anyway.
+          check_commits() {
+            local rule="$1" c sha msg seen=0 checked=0 bad=() closing=()
+            while IFS= read -r c; do
+              [ -n "$c" ] || continue
+              seen=$((seen + 1))
+              sha=$(jq -r '.sha' <<<"$c")
+              msg=$(jq -r '.message' <<<"$c")
+              if [ "$rule" = refs ] && uses_closes "$msg"; then closing+=("${sha:0:7}"); fi
+              [ "$(jq -r '.parents // 1' <<<"$c")" -gt 1 ] && continue
+              checked=$((checked + 1))
+              if [ "$rule" = refs ]; then
+                carries_refs "$msg" || bad+=("${sha:0:7}")
+              else
+                names_issue "$msg" || bad+=("${sha:0:7}")
+              fi
+            done <<<"$commits_json"
+            # Fail closed: a PR always has a commit, so none means the listing failed.
+            [ "$seen" -gt 0 ] || err "the PR's commit list came back empty; refusing to pass"
+            # A PR of merge commits only would pass vacuously: at least one commit must be checked.
+            [ "$seen" -eq 0 ] || [ "$checked" -gt 0 ] || err "every commit is a merge commit; at least one must reference an issue"
+            if [ "${#bad[@]}" -gt 0 ]; then
+              if [ "$rule" = refs ]; then
+                err "commit(s) carry no Refs to an existing issue: ${bad[*]} — end the commit message with 'Refs owner/repo#N'"
+              else
+                err "commit(s) name no existing issue: ${bad[*]}"
+              fi
+            fi
+            if [ "${#closing[@]}" -gt 0 ]; then
+              err "commit(s) use Closes: ${closing[*]} — no PR closes anything, write 'Refs' instead; the close-out step closes the issues"
+            fi
+          }
+
+          # ---- today's rules ----
+          legacy_check() {
+            local branch_num
+            # 1. branch name
+            if [[ ! "$BRANCH" =~ ^([0-9]+)-[a-z0-9-]+$ ]]; then
+              err "branch '$BRANCH' is not {issueNumber}-{slug} — rename the branch to issue-slug"
+            else
+              branch_num="${BASH_REMATCH[1]}"
+              if ! resolve_bare "$branch_num"; then
+                err "branch '$BRANCH' names issue #$branch_num, which does not resolve to an existing issue in $OWN_REPO or alynki/alynki"
+              fi
+            fi
+            # 2. PR title
+            if ! names_issue "$TITLE"; then
+              err "PR title '$TITLE' names no existing issue — name the issue in the title"
+            fi
+            # 3. every commit
+            check_commits names
+            if [ "$fail" -eq 0 ]; then
+              echo "issue-link: pass — branch, title and every commit reference an existing issue"
+            fi
+          }
+
+          # ---- the release-branch flow ----
+          # feature_ok NUM -> 0 iff NUM is an existing issue carrying the release label (or
+          # recovers, a recovery run's feature); on 1 it has printed the reason as an error.
+          feature_ok() {
+            local f="$1" frepo
+            if ! frepo=$(locate_issue "$f"); then
+              err "release branch names #$f, which does not resolve to an existing issue in $OWN_REPO or alynki/alynki — name the feature in the branch: release/{feature#}-{slug}"
+              return 1
+            fi
+            if ! issue_has_label "$frepo" "$f" release recovers; then
+              err "#$f does not carry the 'release' label — add the label release to the feature #$f (the run's first step does), or target the release branch of the feature that has it"
+              return 1
+            fi
+            return 0
+          }
+
+          flow_check() {
+            local w f wrepo frepo
+            if [ "$BASE" = "main" ]; then
+              if [[ "$BRANCH" =~ ^release/([0-9]+)-[a-z0-9-]+$ ]]; then
+                feature_ok "${BASH_REMATCH[1]}" || true
+              elif [ "$OWN_REPO" = "alynki/gcp-infrastructure" ] && [[ "$BRANCH" =~ ^work/([0-9]+)-[a-z0-9-]+$ ]] && pr_has_label image-pin; then
+                # The one exception to "main only from release/**": an image-pin PR.
+                w="${BASH_REMATCH[1]}"
+                resolve_bare "$w" || err "branch '$BRANCH' names issue #$w, which does not resolve to an existing issue in $OWN_REPO or alynki/alynki"
+              else
+                err "a PR into main must come from release/{feature#}-{slug}, not '$BRANCH' — open the PR from the release branch of the feature (labelled release); only an image-pin PR on gcp-infrastructure from work/{issue#}-pin-… may go to main directly"
+              fi
+            else
+              # BASE is release/**
+              f=""
+              if [[ "$BASE" =~ ^release/([0-9]+)-[a-z0-9-]+$ ]]; then
+                f="${BASH_REMATCH[1]}"
+              else
+                err "release branch '$BASE' is not release/{feature#}-{slug} — name it after the feature (suffixes -fix, -post, -migrate, -services allowed)"
+              fi
+              w=""
+              if [[ "$BRANCH" =~ ^work/([0-9]+)-[a-z0-9-]+$ ]]; then
+                w="${BASH_REMATCH[1]}"
+              else
+                err "a PR into $BASE must come from work/{issue#}-{slug}, not '$BRANCH' — rename the branch to work/issue-slug"
+              fi
+              if [ -n "$f" ] && feature_ok "$f"; then
+                if [ -n "$w" ]; then
+                  if ! wrepo=$(locate_issue "$w"); then
+                    err "branch '$BRANCH' names issue #$w, which does not resolve to an existing issue in $OWN_REPO or alynki/alynki"
+                  else
+                    frepo=$(locate_issue "$f")
+                    descends_from "$wrepo" "$w" "$frepo" "$f" ||
+                      err "issue #$w is not a sub-issue (nested allowed) of the feature #$f that $BASE names — add #$w as a sub-issue of #$f, or target the release branch of the feature it belongs to"
+                  fi
+                fi
+              fi
+            fi
+            # Refs on the PR (title or body) and on every non-merge commit; no PR closes anything.
+            carries_refs "$TITLE"$'\n'"${BODY:-}" || err "the PR carries no Refs to an existing issue — write 'Refs owner/repo#N' in the PR body"
+            if uses_closes "$TITLE"$'\n'"${BODY:-}"; then
+              err "the PR uses Closes — no PR closes anything, write 'Refs' instead; the close-out step closes the issues"
+            fi
+            check_commits refs
+            if [ "$fail" -eq 0 ]; then
+              echo "issue-link: pass — $BRANCH into $BASE, the release label, the sub-issue and Refs hold"
+            fi
+          }
+
+          # ---- which rules ----
+          # The flow judges a PR into release/**, and a PR into main when it is in force or
+          # the PR already uses the flow's branches; anything else keeps today's rules.
+          use_flow=false
+          case "$BASE" in
+            release/*) use_flow=true ;;
+            main)
+              if [ "$FLOW_IN_FORCE" = "true" ] || [[ "$BRANCH" =~ ^(work|release)/ ]]; then use_flow=true; fi
+              ;;
+          esac
+          if [ "$use_flow" = "true" ]; then flow_check; else legacy_check; fi
           exit "$fail"
