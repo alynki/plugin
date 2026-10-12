@@ -34,22 +34,24 @@ jobs:
       id-token: write
     env:
       # Whether the release-branch flow is in force (alynki/alynki#1611;
-      # release-branch-flow.md §9.1 F15: wave 1 is built under today's rules
-      # until the first ruleset apply, alynki/alynki#1616). "false" keeps
-      # today's rules for a PR into main from a branch that is not work/** or
-      # release/** (and keeps the dependabot/** and typed-client/** exemptions,
-      # which the server's typed-client workflow still needs). The ruleset-apply
-      # task sets it to "true"; a PR into release/** is judged by the flow's
-      # rules either way. This env sits under `jobs:` so the plugin copy
-      # mirrors it.
-      FLOW_IN_FORCE: "false"
+      # release-branch-flow.md §9.1 F15). "true" since the cutover switch
+      # (alynki/alynki#1616): every PR into main or release/** is judged by the
+      # flow's rules (main only from release/**, release/** only from work/**,
+      # plus the image-pin exception), and the dependabot/** and typed-client/**
+      # exemptions are gone. ROLLBACK: set this to "false" (and the same line in
+      # plugin's copy): a PR into main from a branch that is not work/** or
+      # release/** is then judged by today's rules again and both exemptions
+      # return; the proof (scripts/issue-link-proof/run.sh) covers both values.
+      # This env sits under `jobs:` so the plugin copy mirrors it.
+      FLOW_IN_FORCE: "true"
     steps:
       # Checked before any credential step, by branch name AND the bot that
       # opened the PR (a name alone could be spoofed by anyone who can push a
       # branch): dependabot/** from dependabot[bot], typed-client/** from the
-      # alynki-ci App, and only until the flow is in force. An exempt PR mints
+      # alynki-ci App, and only while FLOW_IN_FORCE is "false" (the rollback
+      # state). With the flow in force no PR is exempt. An exempt PR mints
       # nothing and passes immediately.
-      - name: Exempt Dependabot and typed-client PRs until the flow is in force (branch and author)
+      - name: Exempt Dependabot and typed-client PRs only while the flow is not in force (branch and author)
         id: exempt
         env:
           BRANCH: ${{ github.event.pull_request.head.ref }}
