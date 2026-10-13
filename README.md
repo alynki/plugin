@@ -368,8 +368,9 @@ the sealed variant, in all eight entries), keeping existing entries:
 
 ## Release notes
 
-- `alynki` 0.24.0 and `alynki-sealed` 0.20.0: no tool and no prompt added (still 39 tools and 39
-  prompts, 38 and 38 sealed, 8 pinned); the tool descriptions of `load_run`, `list_runs`,
+- `alynki` 0.24.0 and `alynki-sealed` 0.20.0: no tool and no prompt added (the server still
+  declares 39 tools and 39 prompts; the sealed variant 38 tools and 38 prompts; a pinned credential
+  8 tools); the tool descriptions of `load_run`, `list_runs`,
   `list_pending_checks`, `start_run`, `release_run`, `create_trigger`, `create_workflow`,
   `update_workflow` and `load_workflow` follow the server, so a run's standing can now be paused or
   terminated. As for every sealed version, reinstall `alynki-local`.
