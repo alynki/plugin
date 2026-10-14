@@ -269,7 +269,7 @@ sequenceDiagram
   S->>M: save_check over MCP, evaluation of a human check
   M-->>S: stop, held for a person
   P->>A: decides the human check over HTTPS in the browser
-  Note over S,P: a stop is held for a person, a limit, or complete
+  Note over S,P: a stop is held for a person, a limit, paused, terminated, or complete
 ```
 
 Key: solid arrow, a request; dashed arrow, a reply; the loop ends at a stop.
@@ -368,6 +368,11 @@ the sealed variant, in all eight entries), keeping existing entries:
 
 ## Release notes
 
+- `alynki` 0.24.0 and `alynki-sealed` 0.20.0: no tool and no prompt added (the counts are those
+  of the diagram above); the tool descriptions of `load_run`, `list_runs`,
+  `list_pending_checks`, `start_run`, `release_run`, `create_trigger`, `create_workflow`,
+  `update_workflow` and `load_workflow` follow the server, so a run's standing can now be paused or
+  terminated. As for every sealed version, reinstall `alynki-local`.
 - `alynki` 0.23.0 and `alynki-sealed` 0.19.0: `/alynki:setup` also asks before
   `update_principal_agent`, so seven tools ask; re-run it on a machine set up earlier to add the
   rule. The pinned-token text offers only an operator-issued token, since the app no longer reveals

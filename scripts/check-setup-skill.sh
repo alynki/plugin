@@ -38,6 +38,8 @@ absent_word() { ! grep -qiw -- "$1" "$2"; }
 gate_size() { [ "$(grep -cE '^- `[a-z_]+`$' "$1")" -eq "$2" ]; }
 in_readme_json() { grep -qF "\"mcp__plugin_alynki_alynki__$1\"" README.md; }
 not_in_readme_json() { ! grep -qF "mcp__plugin_alynki_alynki__$1" README.md; }
+# A count in a list item or paragraph is read in the context of the nearest preceding class word: "sealed" before "39 tools" is wrong.
+absent_sealed_39() { ! tr -d '*`' <"$1" | awk '/^[ \t]*$/ || /^[ \t]*#/ || /^[ \t]*[-*][ \t]/ || /\["/ { c = "" } { l = tolower($0); gsub(/[^a-z0-9-]/, " ", l); n = split(l, w, " "); for (i = 1; i <= n; i++) { if (index(w[i], "sealed") > 0) c = "sealed"; else if (w[i] == "server" || w[i] == "pinned" || w[i] == "interactive") c = ""; if (c == "sealed" && (w[i] == "39" || w[i] == "thirty-nine") && (w[i+1] == "tools" || w[i+1] == "prompts")) bad = 1 } } END { exit !bad }'; }
 in_readme_all() { for t in "$@"; do grep -qF "\`$t\`" README.md || return 1; done; }
 named_in_readme() { grep -qF "\`$1\` $2" README.md; }
 
@@ -70,6 +72,8 @@ ok "the README does not say the sealed proxy mirrors none of the run surface" ab
 ok "the README names the run tools the sealed proxy mirrors" in_readme_all load_run load_step load_check save_run save_check create_run release_run
 ok "the README names ALYNKI_AUTH_URL" grep -qF 'ALYNKI_AUTH_URL' README.md
 ok "the README names CLAUDE_CONFIG_DIR, which headers.sh reads" grep -qF 'CLAUDE_CONFIG_DIR' README.md
+ok "the README quotes no sealed count of 39 (the sealed proxy has no start_run: 38 tools, 38 prompts)" absent_sealed_39 README.md
+ok "the README's run-stop note names the states load_run declares (held, paused, terminated, complete)" grep -qF 'held for a person, a limit, paused, terminated, or complete' README.md
 
 echo "$n assertions, $failed failed"
 [ "$failed" -eq 0 ] || exit 1
