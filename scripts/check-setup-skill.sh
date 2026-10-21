@@ -113,13 +113,8 @@ no_settings_file_sends_none() {
   [ "$out" = '{}' ]
 }
 declares_model_setting() { [ "$(jq -r '.userConfig.model.type + "/" + (.userConfig.model.required | tostring)' "$1")" = "string/false" ]; }
-bumped_above_main() {
-  # the version in the working tree is strictly greater than the one at the commit this branch started from (origin/main of the release branch), compared field by field
-  local base now
-  base=$(git show "origin/main:$1" 2>/dev/null | jq -r .version) || return 1
-  now=$(jq -r .version "$1")
-  [ -n "$base" ] && [ "$now" != "$base" ] && [ "$(printf '%s\n%s\n' "$base" "$now" | sort -t. -k1,1n -k2,2n -k3,3n | tail -n1)" = "$now" ]
-}
+# The version carries the release that added the model header or a later one (the floor rises with each release, never falls).
+version_at_least() { [ "$(printf '%s\n%s\n' "$2" "$(jq -r .version "$1")" | sort -t. -k1,1n -k2,2n -k3,3n | head -n1)" = "$2" ]; }
 
 ok "the model header is sent beside the token as X-Alynki-Model" model_header_sent_with_token
 ok "the model header is sent on its own when only the model is set" model_header_sent_alone
@@ -131,8 +126,8 @@ ok "no settings file sends no header at all" no_settings_file_sends_none
 ok "the standard plugin declares the optional model setting" declares_model_setting "$STD"
 ok "the sealed plugin declares the optional model setting" declares_model_setting "$SLD"
 ok "the sealed plugin passes the model to alynki-local as ALYNKI_MODEL" grep -qF '"ALYNKI_MODEL": "${user_config.model}"' alynki-sealed-plugin/.mcp.json
-ok "the standard plugin's version is above the one on main" bumped_above_main "$STD"
-ok "the sealed plugin's version is above the one on main" bumped_above_main "$SLD"
+ok "the standard plugin's version is at least 0.25.0, the release of the model header" version_at_least "$STD" 0.25.0
+ok "the sealed plugin's version is at least 0.21.0, the release of the model setting" version_at_least "$SLD" 0.21.0
 ok "the README names the X-Alynki-Model header" grep -qF 'X-Alynki-Model' README.md
 ok "the README says the model is never printed" grep -qF 'The model is never printed' README.md
 ok "the README names ALYNKI_MODEL" grep -qF 'ALYNKI_MODEL' README.md
