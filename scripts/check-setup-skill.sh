@@ -117,6 +117,7 @@ no_settings_file_sends_none() {
   rm -rf "$d"
   [ "$out" = '{}' ]
 }
+sealed_has_no_model() { ! grep -qF 'ALYNKI_MODEL' alynki-sealed-plugin/.mcp.json && [ "$(jq -r '.userConfig | has("model")' "$SLD")" = "false" ]; }
 declares_model_setting() { [ "$(jq -r '.userConfig.model.type + "/" + (.userConfig.model.required | tostring)' "$1")" = "string/false" ]; }
 # The version carries the release that added the model header or a later one (the floor rises with each release, never falls).
 version_at_least() { [ "$(printf '%s\n%s\n' "$2" "$(jq -r .version "$1")" | sort -t. -k1,1n -k2,2n -k3,3n | head -n1)" = "$2" ]; }
@@ -138,7 +139,8 @@ ok "the standard plugin's version is at least 0.25.0, the release of the model h
 # ok "the sealed plugin's version is at least 0.21.0, the release of the model setting" version_at_least "$SLD" 0.21.0
 ok "the README names the X-Alynki-Model header" grep -qF 'X-Alynki-Model' README.md
 ok "the README says the model is never printed" grep -qF 'The model is never printed' README.md
-ok "the README names ALYNKI_MODEL" grep -qF 'ALYNKI_MODEL' README.md
+ok "the README does not name ALYNKI_MODEL, which alynki-local does not read" absent 'ALYNKI_MODEL' README.md
+ok "the sealed plugin passes no ALYNKI_MODEL and declares no model setting" sealed_has_no_model
 ok "the README states the trail is delivered once per lease" grep -qF 'The trail is delivered once per lease' README.md
 ok "the README says the trail comes again with start_run or load_run" grep -qF '`start_run` again, or' README.md
 

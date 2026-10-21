@@ -162,9 +162,6 @@ credential, server-side (*Status*).
 - **Alynki organisation key** and **Alynki key id**: leave both blank and run
   `alynki-local key import` (with `ALYNKI_KEY` and `ALYNKI_KEY_ID` set in your shell), so the key
   lives in the `alynki-local` store and never in this plugin's configuration.
-- **Alynki model**: the model the session runs on. When set, the plugin's `.mcp.json` passes it to
-  `alynki-local` as `ALYNKI_MODEL`; leave it blank otherwise. Sealed tenants are discontinued for
-  now, so `alynki-local` does not send it as a header yet.
 
 Non-interactive form:
 
@@ -185,9 +182,6 @@ Every variable the plugins and `alynki-local` read, and where:
   `alynki-local` reads it in `login`, `logout` and when it refreshes a stored login.
 - `ALYNKI_TOKEN`: a pinned token. `alynki-local` reads it at startup; when set it wins over a stored
   login. The sealed plugin's `.mcp.json` fills it from the plugin's token field.
-- `ALYNKI_MODEL`: the model the session runs on. The sealed plugin's `.mcp.json` fills it from the
-  plugin's model field; `alynki-local` does not send it yet (sealed tenants are discontinued for
-  now). The standard plugin sends the same setting as the `X-Alynki-Model` header instead.
 - `ALYNKI_KEY` and `ALYNKI_KEY_ID`: the organisation key and its id, both or neither.
   `alynki-local` reads them at startup, in `alynki-local key import` (which stores them) and in
   `alynki-local seal`; when set they override the stored key. The sealed plugin's `.mcp.json` fills
@@ -397,12 +391,12 @@ the sealed variant, in all eight entries), keeping existing entries:
 
 ## Release notes
 
-- `alynki` 0.25.0 and `alynki-sealed` 0.21.0: a new optional **model** setting beside the token;
-  the standard plugin sends it as the second header `X-Alynki-Model` and sends nothing when it is
-  absent (the sealed plugin passes it to `alynki-local` as `ALYNKI_MODEL`, which does not send it
-  yet). The README states that the trail now arrives once per lease. No tool and no prompt added
-  (the counts are those of the diagram above). As for every sealed version, reinstall
-  `alynki-local`.
+- `alynki` 0.25.0 and `alynki-sealed` 0.21.0: a new optional **model** setting beside the token in
+  the standard plugin, which sends it as the second header `X-Alynki-Model` and sends nothing when
+  it is absent; the sealed plugin has no model setting (sealed tenants are discontinued for now, and
+  `alynki-local` does not read one). The README states that the trail now arrives once per lease.
+  No tool and no prompt added (the counts are those of the diagram above). As for every sealed
+  version, reinstall `alynki-local`.
 - `alynki` 0.24.0 and `alynki-sealed` 0.20.0: no tool and no prompt added (the counts are those
   of the diagram above); the tool descriptions of `load_run`, `list_runs`,
   `list_pending_checks`, `start_run`, `release_run`, `create_trigger`, `create_workflow`,
