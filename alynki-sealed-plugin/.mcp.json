@@ -6,7 +6,8 @@
       "ALYNKI_URL": "https://mcp.alynki.com/mcp",
       "ALYNKI_TOKEN": "${user_config.token}",
       "ALYNKI_KEY": "${user_config.key}",
-      "ALYNKI_KEY_ID": "${user_config.key_id}"
+      "ALYNKI_KEY_ID": "${user_config.key_id}",
+      "ALYNKI_MODEL": "${user_config.model}"
     },
     "alwaysLoad": true
   }
