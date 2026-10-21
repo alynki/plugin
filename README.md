@@ -2,6 +2,8 @@
 
 > Knowledge is inherited, not rediscovered.
 
+> Sealed tenants are discontinued for now and are not part of our product offering at the moment; they may be revisited if a customer asks.
+
 The Claude Code plugin for Alynki, the business context layer. It loads your organisation's
 governed context into every session: the policy and product context for the scope your credential
 holds and, where that scope sits in a workflow, the steps, checks and runs that define how the work
@@ -9,8 +11,8 @@ is done. Alynki delivers to a principal only what that principal is granted; it 
 what an agent obtains from other sources.
 
 Two variants ship from this marketplace: **`alynki`** (the standard install) and
-**`alynki-sealed`** (for organisations that have opted into sealing: context is decrypted locally
-on your machine). Install one or the other, as your Alynki operator directs.
+**`alynki-sealed`** (the sealed variant, discontinued for now: context is decrypted locally on your
+machine). Install `alynki`; `alynki-sealed` is kept for the record and is not offered at the moment.
 
 ## Repository layout
 
@@ -120,7 +122,9 @@ consistency control, not a boundary: a call without it is not checked by the ser
 
 ## Install: `alynki-sealed`
 
-For organisations that have opted into sealing. **A local process, `alynki-local`, runs on your
+> Sealed tenants are discontinued for now and are not part of our product offering at the moment; they may be revisited if a customer asks.
+
+Kept as a record of what the variant is; it is not offered at the moment. **A local process, `alynki-local`, runs on your
 machine**: Claude Code launches it for each session, it calls the same hosted endpoint and decrypts
 your context locally. The hosted service stores and serves ciphertext only; your organisation key
 never leaves this machine.
