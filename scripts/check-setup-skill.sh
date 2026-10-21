@@ -75,6 +75,70 @@ ok "the README names CLAUDE_CONFIG_DIR, which headers.sh reads" grep -qF 'CLAUDE
 ok "the README quotes no sealed count of 39 (the sealed proxy has no start_run: 38 tools, 38 prompts)" absent_sealed_39 README.md
 ok "the README's run-stop note names the states load_run declares (held, paused, terminated, complete)" grep -qF 'held for a person, a limit, paused, terminated, or complete' README.md
 
+# The model header (alynki/alynki#1918): the standard plugin's header script sends the optional `model`
+# setting as the second header X-Alynki-Model, and nothing when it is absent or is not a plain model id.
+HEADERS=alynki-plugin/bin/headers.sh
+# headers_for <settings.json body>: runs the script against that settings file; stdout is the header JSON, stderr is kept apart.
+headers_for() {
+  local d out err
+  d=$(mktemp -d) || return 1
+  printf '%s' "$1" >"$d/settings.json"
+  out=$(CLAUDE_CONFIG_DIR="$d" sh "$HEADERS" 2>"$d/stderr")
+  err=$(cat "$d/stderr")
+  rm -rf "$d"
+  HEADERS_OUT=$out
+  HEADERS_ERR=$err
+}
+settings_with() { printf '{"pluginConfigs":{"alynki@alynki-marketplace":{"options":%s}}}' "$1"; }
+hdr_eq() { headers_for "$(settings_with "$1")" && [ "$(printf '%s' "$HEADERS_OUT" | jq -cS .)" = "$2" ]; }
+model_header_sent_with_token() { hdr_eq '{"token":"tok-1","model":"claude-sonnet-5-5"}' '{"Authorization":"Bearer tok-1","X-Alynki-Model":"claude-sonnet-5-5"}'; }
+model_header_sent_alone() { hdr_eq '{"model":"claude-sonnet-5-5"}' '{"X-Alynki-Model":"claude-sonnet-5-5"}'; }
+model_header_absent_sends_none() { hdr_eq '{"token":"tok-1"}' '{"Authorization":"Bearer tok-1"}' && hdr_eq '{}' '{}'; }
+model_header_blank_sends_none() { hdr_eq '{"token":"tok-1","model":""}' '{"Authorization":"Bearer tok-1"}'; }
+model_header_refused_when_malformed() {
+  hdr_eq '{"token":"tok-1","model":"-x"}' '{"Authorization":"Bearer tok-1"}' &&
+    hdr_eq '{"token":"tok-1","model":"a b"}' '{"Authorization":"Bearer tok-1"}' &&
+    hdr_eq '{"token":"tok-1","model":"a\nb: c"}' '{"Authorization":"Bearer tok-1"}' &&
+    hdr_eq "{\"token\":\"tok-1\",\"model\":\"$(printf 'm%.0s' $(seq 1 101))\"}" '{"Authorization":"Bearer tok-1"}'
+}
+model_never_printed() {
+  headers_for "$(settings_with '{"token":"tok-1","model":"claude-sonnet-5-5"}')" && [ -z "$HEADERS_ERR" ] &&
+    ! grep -qiE 'echo[^|]*model|printf[^|]*model|>&2' "$HEADERS"
+}
+no_settings_file_sends_none() {
+  local d out
+  d=$(mktemp -d) || return 1
+  out=$(CLAUDE_CONFIG_DIR="$d" sh "$HEADERS" 2>&1)
+  rm -rf "$d"
+  [ "$out" = '{}' ]
+}
+declares_model_setting() { [ "$(jq -r '.userConfig.model.type + "/" + (.userConfig.model.required | tostring)' "$1")" = "string/false" ]; }
+bumped_above_main() {
+  # the version in the working tree is strictly greater than the one at the commit this branch started from (origin/main of the release branch), compared field by field
+  local base now
+  base=$(git show "origin/main:$1" 2>/dev/null | jq -r .version) || return 1
+  now=$(jq -r .version "$1")
+  [ -n "$base" ] && [ "$now" != "$base" ] && [ "$(printf '%s\n%s\n' "$base" "$now" | sort -t. -k1,1n -k2,2n -k3,3n | tail -n1)" = "$now" ]
+}
+
+ok "the model header is sent beside the token as X-Alynki-Model" model_header_sent_with_token
+ok "the model header is sent on its own when only the model is set" model_header_sent_alone
+ok "no model header is sent when the model setting is absent" model_header_absent_sends_none
+ok "no model header is sent when the model setting is blank" model_header_blank_sends_none
+ok "a model that is not a plain model id is refused: no header is sent for it" model_header_refused_when_malformed
+ok "the model is never printed: nothing on stderr and no echo of it in the script" model_never_printed
+ok "no settings file sends no header at all" no_settings_file_sends_none
+ok "the standard plugin declares the optional model setting" declares_model_setting "$STD"
+ok "the sealed plugin declares the optional model setting" declares_model_setting "$SLD"
+ok "the sealed plugin passes the model to alynki-local as ALYNKI_MODEL" grep -qF '"ALYNKI_MODEL": "${user_config.model}"' alynki-sealed-plugin/.mcp.json
+ok "the standard plugin's version is above the one on main" bumped_above_main "$STD"
+ok "the sealed plugin's version is above the one on main" bumped_above_main "$SLD"
+ok "the README names the X-Alynki-Model header" grep -qF 'X-Alynki-Model' README.md
+ok "the README says the model is never printed" grep -qF 'The model is never printed' README.md
+ok "the README names ALYNKI_MODEL" grep -qF 'ALYNKI_MODEL' README.md
+ok "the README states the trail is delivered once per lease" grep -qF 'The trail is delivered once per lease' README.md
+ok "the README says the trail comes again with start_run or load_run" grep -qF '`start_run` again, or' README.md
+
 echo "$n assertions, $failed failed"
 [ "$failed" -eq 0 ] || exit 1
 floor=${SETUP_CHECK_FLOOR:-0}

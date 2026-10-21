@@ -1,6 +1,6 @@
 {
   "name": "alynki-sealed",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "description": "Alynki \u2014 the business context layer, sealed: a local component decrypts context on this machine",
   "author": {
     "name": "Alynki"
@@ -24,6 +24,13 @@
       "type": "string",
       "title": "Alynki key id (optional \u2014 set once via alynki-local key import)",
       "description": "The id of your organisation key, issued alongside it. Leave this blank if you imported the key with `alynki-local key import`.",
+      "required": false
+    },
+    "model": {
+      "type": "string",
+      "title": "Alynki model (optional \u2014 leave blank unless your operator says otherwise)",
+      "description": "The model this session runs on, for example claude-sonnet-5-5. When set, it is passed to alynki-local as ALYNKI_MODEL; when blank, none is passed. Sealed tenants are discontinued for now, so alynki-local does not send it yet.",
+      "sensitive": false,
       "required": false
     }
   }

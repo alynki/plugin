@@ -41,8 +41,8 @@ graph TB
   subgraph std["alynki (standard): HTTP MCP connection"]
     helper["bin/headers.sh: headersHelper"]
     tok{"Pinned token in settings.json pluginConfigs?"}
-    hdr["Emits Authorization: Bearer token"]
-    none["Emits an empty object: no header"]
+    hdr["Emits Authorization: Bearer token, and X-Alynki-Model when the model setting is present"]
+    none["Emits an empty object, or only X-Alynki-Model when the model setting is present"]
     oauth["Claude Code OAuth 2.1 discovery and browser sign-in"]
   end
 
@@ -81,7 +81,8 @@ machine; the two boxed groups are the two variants.
 A static `headers.Authorization` key in `.mcp.json` would disable Claude Code's OAuth fallback
 unconditionally, even when its value is empty, so the standard plugin decides at connection time
 with a `headersHelper` script. The script reads the token with `jq`; without `jq` on `PATH` it emits
-no header and the session signs in instead. An agent working a run unattended has one credential,
+no header and the session signs in instead. The same script sends the session's model as a second
+header (see *The model header*). An agent working a run unattended has one credential,
 the one its controller issues it, and never sees a sign-in prompt.
 
 ## Install: `alynki` (standard)
@@ -105,6 +106,17 @@ browser.
 works only through the credential a controller is issued, so there is nothing to copy from the app
 into this field. A token revealed before V2.5.2 was retired; if one is still in the field, the
 server answers 401 `token not recognised`. Clear the field and sign in with `/mcp`.
+
+### The model header
+
+An optional setting, **`model`**, sits beside the token in the plugin's configuration. When it is
+set (for example `claude-sonnet-5-5`), `bin/headers.sh` sends it with every call as the second
+header, **`X-Alynki-Model`**, next to `Authorization`; when it is absent or is not a plain model id
+(letters, digits, `.`, `_`, `:`, `-`, at most 100 characters, no leading `-`), **no model header is
+sent**. The model is never printed: the script's only output is the header JSON Claude Code
+consumes. A controller that launches a session on a chosen model writes the setting into that
+session's private settings; a person's own session leaves it blank and sends none. The header is a
+consistency control, not a boundary: a call without it is not checked by the server.
 
 ## Install: `alynki-sealed`
 
@@ -135,7 +147,7 @@ operator or developer path, not a colleague path.) Then:
 /reload-plugins
 ```
 
-Installing prompts for three values, **all optional** (each can instead be set up by running
+Installing prompts for four values, **all optional** (each can instead be set up by running
 `alynki-local` once from a terminal). ⚠️ **No tenant is asked for**: it is resolved from your
 credential, server-side (*Status*).
 
@@ -146,6 +158,9 @@ credential, server-side (*Status*).
 - **Alynki organisation key** and **Alynki key id**: leave both blank and run
   `alynki-local key import` (with `ALYNKI_KEY` and `ALYNKI_KEY_ID` set in your shell), so the key
   lives in the `alynki-local` store and never in this plugin's configuration.
+- **Alynki model**: the model the session runs on. When set, the plugin's `.mcp.json` passes it to
+  `alynki-local` as `ALYNKI_MODEL`; leave it blank otherwise. Sealed tenants are discontinued for
+  now, so `alynki-local` does not send it as a header yet.
 
 Non-interactive form:
 
@@ -166,13 +181,16 @@ Every variable the plugins and `alynki-local` read, and where:
   `alynki-local` reads it in `login`, `logout` and when it refreshes a stored login.
 - `ALYNKI_TOKEN`: a pinned token. `alynki-local` reads it at startup; when set it wins over a stored
   login. The sealed plugin's `.mcp.json` fills it from the plugin's token field.
+- `ALYNKI_MODEL`: the model the session runs on. The sealed plugin's `.mcp.json` fills it from the
+  plugin's model field; `alynki-local` does not send it yet (sealed tenants are discontinued for
+  now). The standard plugin sends the same setting as the `X-Alynki-Model` header instead.
 - `ALYNKI_KEY` and `ALYNKI_KEY_ID`: the organisation key and its id, both or neither.
   `alynki-local` reads them at startup, in `alynki-local key import` (which stores them) and in
   `alynki-local seal`; when set they override the stored key. The sealed plugin's `.mcp.json` fills
   them from the plugin's key fields.
 - `CLAUDE_CONFIG_DIR`: where Claude Code keeps `settings.json`. The standard plugin's
-  `bin/headers.sh` reads the pinned token from `$CLAUDE_CONFIG_DIR/settings.json`, and from
-  `~/.claude/settings.json` when it is unset.
+  `bin/headers.sh` reads the pinned token and the model setting from
+  `$CLAUDE_CONFIG_DIR/settings.json`, and from `~/.claude/settings.json` when it is unset.
 - `CLAUDE_PLUGIN_ROOT`: set by Claude Code to the installed plugin's directory; the standard
   plugin's `.mcp.json` uses it to locate `bin/headers.sh`.
 
@@ -282,6 +300,13 @@ Key: solid arrow, a request; dashed arrow, a reply; the loop ends at a stop.
 - **A pinned session** gets a `context_token` from `load_context`'s last page, required by every
   run, step and check tool, and a `lease_id` from `start_run`, required by every write. Every write
   returns the next action or a stop; following it verbatim is the whole loop.
+- **The trail is delivered once per lease.** `load_step` and `load_check` with a `run` return the
+  whole trail of the run to the holder of the run's lease on its first load after `start_run`; every
+  later load by the holder returns the step's or check's own text and one closing line saying the
+  trail was already delivered, which is faster and uses far fewer tokens. `start_run` again, or
+  `load_run`, returns the records again (after a compaction, for instance). A session that does not
+  hold the lease gets the definition alone, and a save before the first load is refused with the
+  call to make. This is the standard variant only: the sealed variant has no `start_run`.
 - **A human check is decided in the app only, by a person, never over MCP**, by any credential.
   `save_check` records the evaluation and hands the run to a person; deciding it (`approved`) is
   refused and says so.
@@ -368,6 +393,12 @@ the sealed variant, in all eight entries), keeping existing entries:
 
 ## Release notes
 
+- `alynki` 0.25.0 and `alynki-sealed` 0.21.0: a new optional **model** setting beside the token;
+  the standard plugin sends it as the second header `X-Alynki-Model` and sends nothing when it is
+  absent (the sealed plugin passes it to `alynki-local` as `ALYNKI_MODEL`, which does not send it
+  yet). The README states that the trail now arrives once per lease. No tool and no prompt added
+  (the counts are those of the diagram above). As for every sealed version, reinstall
+  `alynki-local`.
 - `alynki` 0.24.0 and `alynki-sealed` 0.20.0: no tool and no prompt added (the counts are those
   of the diagram above); the tool descriptions of `load_run`, `list_runs`,
   `list_pending_checks`, `start_run`, `release_run`, `create_trigger`, `create_workflow`,
