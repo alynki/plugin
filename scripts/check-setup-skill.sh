@@ -43,7 +43,8 @@ absent_sealed_39() { ! tr -d '*`' <"$1" | awk '/^[ \t]*$/ || /^[ \t]*#/ || /^[ \
 in_readme_all() { for t in "$@"; do grep -qF "\`$t\`" README.md || return 1; done; }
 named_in_readme() { grep -qF "\`$1\` $2" README.md; }
 
-ok "the two setup skills are byte-identical" cmp -s "$SKILL" "$SEALED"
+# Sealed tenants are discontinued (alynki/alynki#1093, 2026-10-20); restore if they return.
+# ok "the two setup skills are byte-identical" cmp -s "$SKILL" "$SEALED"
 
 for t in $GATED; do
   ok "the skill lists $t in the human gate" listed "$t" "$SKILL"
@@ -66,13 +67,17 @@ ok "the standard plugin's token field does not offer a revealed agent token" abs
 ok "the standard plugin's hooks do not offer a revealed agent token" absent 'you revealed' alynki-plugin/hooks/hooks.json
 
 ok "the README names the standard plugin's version" named_in_readme alynki "$(jq -r .version "$STD")"
-ok "the README names the sealed plugin's version" named_in_readme alynki-sealed "$(jq -r .version "$SLD")"
+# Sealed tenants are discontinued (alynki/alynki#1093, 2026-10-20); restore if they return.
+# ok "the README names the sealed plugin's version" named_in_readme alynki-sealed "$(jq -r .version "$SLD")"
 
-ok "the README does not say the sealed proxy mirrors none of the run surface" absent 'mirrors none of it' README.md
-ok "the README names the run tools the sealed proxy mirrors" in_readme_all load_run load_step load_check save_run save_check create_run release_run
+# Sealed tenants are discontinued (alynki/alynki#1093, 2026-10-20); restore if they return.
+# ok "the README does not say the sealed proxy mirrors none of the run surface" absent 'mirrors none of it' README.md
+# Sealed tenants are discontinued (alynki/alynki#1093, 2026-10-20); restore if they return.
+# ok "the README names the run tools the sealed proxy mirrors" in_readme_all load_run load_step load_check save_run save_check create_run release_run
 ok "the README names ALYNKI_AUTH_URL" grep -qF 'ALYNKI_AUTH_URL' README.md
 ok "the README names CLAUDE_CONFIG_DIR, which headers.sh reads" grep -qF 'CLAUDE_CONFIG_DIR' README.md
-ok "the README quotes no sealed count of 39 (the sealed proxy has no start_run: 38 tools, 38 prompts)" absent_sealed_39 README.md
+# Sealed tenants are discontinued (alynki/alynki#1093, 2026-10-20); restore if they return.
+# ok "the README quotes no sealed count of 39 (the sealed proxy has no start_run: 38 tools, 38 prompts)" absent_sealed_39 README.md
 ok "the README's run-stop note names the states load_run declares (held, paused, terminated, complete)" grep -qF 'held for a person, a limit, paused, terminated, or complete' README.md
 
 # The model header (alynki/alynki#1918): the standard plugin's header script sends the optional `model`
@@ -124,10 +129,13 @@ ok "a model that is not a plain model id is refused: no header is sent for it" m
 ok "the model is never printed: nothing on stderr and no echo of it in the script" model_never_printed
 ok "no settings file sends no header at all" no_settings_file_sends_none
 ok "the standard plugin declares the optional model setting" declares_model_setting "$STD"
-ok "the sealed plugin declares the optional model setting" declares_model_setting "$SLD"
-ok "the sealed plugin passes the model to alynki-local as ALYNKI_MODEL" grep -qF '"ALYNKI_MODEL": "${user_config.model}"' alynki-sealed-plugin/.mcp.json
+# Sealed tenants are discontinued (alynki/alynki#1093, 2026-10-20); restore if they return.
+# ok "the sealed plugin declares the optional model setting" declares_model_setting "$SLD"
+# Sealed tenants are discontinued (alynki/alynki#1093, 2026-10-20); restore if they return.
+# ok "the sealed plugin passes the model to alynki-local as ALYNKI_MODEL" grep -qF '"ALYNKI_MODEL": "${user_config.model}"' alynki-sealed-plugin/.mcp.json
 ok "the standard plugin's version is at least 0.25.0, the release of the model header" version_at_least "$STD" 0.25.0
-ok "the sealed plugin's version is at least 0.21.0, the release of the model setting" version_at_least "$SLD" 0.21.0
+# Sealed tenants are discontinued (alynki/alynki#1093, 2026-10-20); restore if they return.
+# ok "the sealed plugin's version is at least 0.21.0, the release of the model setting" version_at_least "$SLD" 0.21.0
 ok "the README names the X-Alynki-Model header" grep -qF 'X-Alynki-Model' README.md
 ok "the README says the model is never printed" grep -qF 'The model is never printed' README.md
 ok "the README names ALYNKI_MODEL" grep -qF 'ALYNKI_MODEL' README.md
