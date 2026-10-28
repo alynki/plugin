@@ -205,9 +205,9 @@ graph TB
   cls{"Credential class"}
   pinv{"Variant"}
   intv{"Variant"}
-  p8["alynki, pinned: 8 tools, no prompts, no address argument"]
+  p8["alynki, pinned: 8 tools, no prompts, no node argument"]
   ps["alynki-sealed, pinned: load_context and save_context only"]
-  i39["alynki, interactive: 39 tools and 39 prompts, optional address"]
+  i39["alynki, interactive: 39 tools and 39 prompts, optional node"]
   i38["alynki-sealed, interactive: 38 tools and 38 prompts, no start_run, no work-run"]
 
   cls -->|"tools/list over MCP: pinned token, an agent"| pinv
@@ -223,9 +223,9 @@ rectangle, the surface a session is offered.
 
 - **Pinned** (agent) credentials, including one working a run unattended, are offered exactly
   **eight tools**: `load_context`, `save_context`, `start_run`, `load_run`, `load_step`,
-  `load_check`, `save_run` and `save_check`. `load_context` and `save_context` take **no address
+  `load_check`, `save_run` and `save_check`. `load_context` and `save_context` take **no node
   argument**: scope comes entirely from the token. The run tools take only a run's workflow and
-  label, or a step's or check's address handed over by a run's own next action. No authoring, deletion, move, people or agent tool is served to a pinned
+  label, or a step's or check's `node` handed over by a run's own next action. No authoring, deletion, move, people or agent tool is served to a pinned
   credential: calling one is the refusal for a tool that does not exist.
 - **Interactive** (human) credentials are offered all **thirty-nine** tools (the eight plus every
   node, workflow, run, people, agent, connection and trigger tool). Every tool but `start_run` has a
@@ -234,7 +234,8 @@ rectangle, the surface a session is offered.
 - **Large context is paged** in 25 KiB pages: both credential classes read it with the optional
   `cursor` of `load_context`, `load_step` and `load_check`. Only an interactive session saves a large
   body in staged chunks (`mode` `stage`, then `commit`); a pinned `save_context` has no staged mode
-  and takes the body whole. The tool descriptions and prompts carry the exact rules. What each tool does,
+  and takes the body whole. The seven list tools answer ten rows a page: narrow with `query`, `state`
+  or `node` and follow `next_cursor`. The tool descriptions and prompts carry the exact rules. What each tool does,
   and how confirm tokens, the run lease, the context token, run holds and non-composing reads work,
   is the server's contract: see `alynki/alynki` `docs/architecture/run-continuation.md` and
   `docs/architecture/tool-descriptions.md`.
@@ -290,7 +291,7 @@ sequenceDiagram
 
 Key: solid arrow, a request; dashed arrow, a reply; the loop ends at a stop.
 
-- **In an interactive session**, the `work-run` prompt takes the workflow's address and the run's
+- **In an interactive session**, the `work-run` prompt takes the `workflow` and the `run`'s
   label and works the run to a stop. Unattended work runs through `alynki-controller`, a separate
   customer-side piece that embeds a copy of this plugin: it polls Alynki's controller API (never
   MCP, a different credential and surface) for ready runs and starts one headless session per run it
@@ -391,6 +392,12 @@ the sealed variant, in all eight entries), keeping existing entries:
 
 ## Release notes
 
+- `alynki` 0.26.0 and `alynki-sealed` 0.22.0: the tools and prompts name a place `node` (it was
+  `address`; `parent`, `new_parent`, `path` and `workflow` stay as roles), and the seven list tools
+  page ten rows with `cursor` and `next_cursor`, search with `query` and, for `list_runs`, filter by
+  `state`. No tool and no prompt added (the counts are those of the diagram above), and the
+  `/alynki:setup` list of seven asking tools is unchanged. As for every sealed version, reinstall
+  `alynki-local`.
 - `alynki` 0.25.0 and `alynki-sealed` 0.21.0: a new optional **model** setting beside the token in
   the standard plugin, which sends it as the second header `X-Alynki-Model` and sends nothing when
   it is absent; the sealed plugin has no model setting (sealed tenants are discontinued for now, and
