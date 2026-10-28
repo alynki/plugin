@@ -144,6 +144,10 @@ ok "the sealed plugin passes no ALYNKI_MODEL and declares no model setting" seal
 ok "the README states the trail is delivered once per lease" grep -qF 'The trail is delivered once per lease' README.md
 ok "the README says the trail comes again with start_run or load_run" grep -qF '`start_run` again, or' README.md
 
+# One name for a place (alynki/alynki#2269): the tools, the prompts and the next actions say `node`, never `address`.
+ok "the README names no address argument (the tools say node)" absent "no address argument|optional address|check.s address|workflow.s address" README.md
+ok "the standard plugin's version is at least 0.26.0, the release of the node rename" version_at_least "$STD" 0.26.0
+
 echo "$n assertions, $failed failed"
 [ "$failed" -eq 0 ] || exit 1
 floor=${SETUP_CHECK_FLOOR:-0}
