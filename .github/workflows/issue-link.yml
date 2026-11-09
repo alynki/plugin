@@ -284,7 +284,7 @@ jobs:
           # closed: a PR always has a commit, so none means the listing failed. The PR's own
           # commit count and head repository come from the Pulls API (pr_info).
           commits_json=$(GH_TOKEN="$GITHUB_TOKEN" gh api --paginate "repos/$OWN_REPO/pulls/$PR_NUMBER/commits" \
-            --jq '.[] | {sha, message: .commit.message, parents: [.parents[].sha]}' | jq -s -c '.[]')
+            --jq '.[] | {sha, message: .commit.message, tree: .commit.tree.sha, parents: [.parents[].sha]}' | jq -s -c '.[]')
           pr_info=$(GH_TOKEN="$GITHUB_TOKEN" gh api "repos/$OWN_REPO/pulls/$PR_NUMBER" \
             --jq '"\(.commits) \(.head.repo.full_name // "")"' 2>/dev/null) || pr_info=""
           pr_commit_count="${pr_info%% *}"
@@ -301,19 +301,32 @@ jobs:
             [ "$status" = behind ] || [ "$status" = identical ]
           }
 
+          # commit_tree SHA -> prints the tree SHA of the commit, or nothing when it cannot be read.
+          commit_tree() {
+            [[ "$1" =~ ^[0-9a-f]{40}$ ]] || return 0
+            GH_TOKEN="$GITHUB_TOKEN" gh api "repos/$OWN_REPO/git/commits/$1" --jq .tree.sha 2>/dev/null || true
+          }
+
           # skippable_merge COMMIT_JSON LISTED_SHAS -> 0 iff the merge commit is what "update
           # branch" or `git merge main` makes: exactly two parents, one an ancestor of the base
           # (the base branch's side) and the other a commit of the PR's own listed commits (the
           # branch's side). Two commits of the base, or any parent from outside the branch, is not
-          # an update and is judged.
+          # an update and is judged. One more shape is an update: a branch that has no commit of
+          # its own yet (its tip is in the base) merged with the base's tip, which GitHub's
+          # "update branch" writes as a merge of two base commits. It adds nothing only when its
+          # tree is exactly one parent's tree, so both parents must be base commits and the merge's
+          # tree must equal one of theirs; two base commits merged into any other tree are judged.
           skippable_merge() {
-            local c="$1" listed="$2" n a b
+            local c="$1" listed="$2" n a b t
             n=$(jq -r '.parents | length' <<<"$c")
             [ "$n" -eq 2 ] || return 1
             a=$(jq -r '.parents[0]' <<<"$c")
             b=$(jq -r '.parents[1]' <<<"$c")
             if grep -qxF "$a" <<<"$listed" && is_base_ancestor "$b"; then return 0; fi
             if grep -qxF "$b" <<<"$listed" && is_base_ancestor "$a"; then return 0; fi
+            t=$(jq -r '.tree // ""' <<<"$c")
+            [[ "$t" =~ ^[0-9a-f]{40}$ ]] || return 1
+            if is_base_ancestor "$a" && is_base_ancestor "$b" && { [ "$(commit_tree "$a")" = "$t" ] || [ "$(commit_tree "$b")" = "$t" ]; }; then return 0; fi
             return 1
           }
 
