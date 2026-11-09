@@ -397,7 +397,7 @@ the sealed variant, in all eight entries), keeping existing entries:
 
 ## Release notes
 
-- `alynki` 0.27.0 and `alynki-sealed` 0.23.0: five tools added for interactive credentials,
+- `alynki` 0.27.0 and `alynki-sealed` 0.23.0: the inherited-check tools added for interactive credentials,
   `create_inherited_check`, `list_inherited_checks`, `load_inherited_check`,
   `move_inherited_check` and `delete_inherited_check` (the counts are those of the diagram above;
   the agent set stays eight). `load_step`, `load_check`, `save_run` and `save_check` take labels
@@ -424,7 +424,7 @@ the sealed variant, in all eight entries), keeping existing entries:
 - `alynki` 0.23.0 and `alynki-sealed` 0.19.0: `/alynki:setup` also asks before
   `update_principal_agent`, so seven tools ask; re-run it on a machine set up earlier to add the
   rule. The pinned-token text offers only an operator-issued token, since the app no longer reveals
-  agent tokens. The tool counts follow the server's 39 tools. As for every sealed version, reinstall
+  agent tokens. The tool counts followed the server's tool list of that release (39 at the time). As for every sealed version, reinstall
   `alynki-local`.
 
 ## Status
