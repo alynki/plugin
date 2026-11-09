@@ -148,6 +148,14 @@ ok "the README says the trail comes again with start_run or load_run" grep -qF '
 ok "the README names no address argument (the tools say node)" absent "no address argument|optional address|check.s address|workflow.s address" README.md
 ok "the standard plugin's version is at least 0.26.0, the release of the node rename" version_at_least "$STD" 0.26.0
 
+# The five inherited-check tools (alynki/alynki#2829): named in the README, counted as 44 tools and 44 prompts, the sealed version moves with it.
+ok "the standard plugin's version is at least 0.27.0, the release of the five inherited-check tools" version_at_least "$STD" 0.27.0
+ok "the sealed plugin's version is at least 0.23.0, moving with the standard plugin" version_at_least "$SLD" 0.23.0
+ok "the README names the five inherited-check tools" in_readme_all create_inherited_check list_inherited_checks load_inherited_check move_inherited_check delete_inherited_check
+ok "the README carries no stale interactive count (thirty-nine)" absent_word thirty-nine README.md
+ok "the README counts forty-four interactive tools and prompts" grep -qF 'all **forty-four** tools' README.md
+ok "the README's settings example does not ask before the five new tools" not_in_readme_json create_inherited_check
+
 echo "$n assertions, $failed failed"
 [ "$failed" -eq 0 ] || exit 1
 floor=${SETUP_CHECK_FLOOR:-0}
