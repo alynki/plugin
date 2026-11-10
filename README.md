@@ -207,15 +207,15 @@ graph TB
   intv{"Variant"}
   p8["alynki, pinned: 8 tools, no prompts, no node argument"]
   ps["alynki-sealed, pinned: load_context and save_context only"]
-  i39["alynki, interactive: 39 tools and 39 prompts, optional node"]
-  i38["alynki-sealed, interactive: 38 tools and 38 prompts, no start_run, no work-run"]
+  i44["alynki, interactive: 44 tools and 44 prompts, optional node"]
+  i43["alynki-sealed, interactive: 43 tools and 43 prompts, no start_run, no work-run"]
 
   cls -->|"tools/list over MCP: pinned token, an agent"| pinv
   cls -->|"tools/list over MCP: interactive token, a human"| intv
   pinv -->|"HTTP connection"| p8
   pinv -->|"stdio connection via alynki-local"| ps
-  intv -->|"HTTP connection"| i39
-  intv -->|"stdio connection via alynki-local"| i38
+  intv -->|"HTTP connection"| i44
+  intv -->|"stdio connection via alynki-local"| i43
 ```
 
 Key: diamond, a decision made by the server (class) or by the plugin you installed (variant);
@@ -224,17 +224,22 @@ rectangle, the surface a session is offered.
 - **Pinned** (agent) credentials, including one working a run unattended, are offered exactly
   **eight tools**: `load_context`, `save_context`, `start_run`, `load_run`, `load_step`,
   `load_check`, `save_run` and `save_check`. `load_context` and `save_context` take **no node
-  argument**: scope comes entirely from the token. The run tools take only a run's workflow and
-  label, or a step's or check's `node` handed over by a run's own next action. No authoring, deletion, move, people or agent tool is served to a pinned
-  credential: calling one is the refusal for a tool that does not exist.
-- **Interactive** (human) credentials are offered all **thirty-nine** tools (the eight plus every
-  node, workflow, run, people, agent, connection and trigger tool). Every tool but `start_run` has a
-  typed slash prompt taking one whole-string argument, and the composite prompt **`work-run`**
-  covers `start_run`: thirty-nine prompts. Prompts are never offered to a pinned credential.
+  argument**: scope comes entirely from the token. The run tools take labels: `start_run` and
+  `load_run` a `workflow` and the run's `label`; `load_step` and `load_check` a `workflow`, the `run`
+  and the `step` or `check`; `save_run` and `save_check` a `workflow`, the run's `label` and the
+  `step` or `check`. `step` accompanies a `check` only when that check's label repeats under two
+  steps. Outside a run, `load_step` and `load_check` read the template with `node`. No authoring,
+  deletion, move, people or agent tool is served to a pinned credential: calling one is the refusal
+  for a tool that does not exist.
+- **Interactive** (human) credentials are offered all **forty-four** tools (the eight plus every
+  other tool, among them `create_inherited_check`, `list_inherited_checks`, `load_inherited_check`,
+  `move_inherited_check` and `delete_inherited_check`). Every tool but `start_run` has a typed slash
+  prompt taking one whole-string argument, and the composite prompt **`work-run`** covers
+  `start_run`: forty-four prompts. Prompts are never offered to a pinned credential.
 - **Large context is paged** in 25 KiB pages: both credential classes read it with the optional
   `cursor` of `load_context`, `load_step` and `load_check`. Only an interactive session saves a large
   body in staged chunks (`mode` `stage`, then `commit`); a pinned `save_context` has no staged mode
-  and takes the body whole. The seven list tools answer ten rows a page: narrow with `query`, `state`
+  and takes the body whole. The eight list tools answer ten rows a page: narrow with `query`, `state`
   or `node` and follow `next_cursor`. The tool descriptions and prompts carry the exact rules. What each tool does,
   and how confirm tokens, the run lease, the context token, run holds and non-composing reads work,
   is the server's contract: see `alynki/alynki` `docs/architecture/run-continuation.md` and
@@ -392,6 +397,13 @@ the sealed variant, in all eight entries), keeping existing entries:
 
 ## Release notes
 
+- `alynki` 0.27.0 and `alynki-sealed` 0.23.0: the inherited-check tools added for interactive credentials,
+  `create_inherited_check`, `list_inherited_checks`, `load_inherited_check`,
+  `move_inherited_check` and `delete_inherited_check` (the counts are those of the diagram above;
+  the agent set stays eight). `load_step`, `load_check`, `save_run` and `save_check` take labels
+  (`workflow`, `run` or `label`, `step`, `check`). The `/alynki:setup` list of seven asking tools is
+  unchanged. Update `alynki` to 0.27.0; `alynki-sealed` 0.23.0 is a version bump only. As for every
+  sealed version, reinstall `alynki-local`.
 - `alynki` 0.26.0 and `alynki-sealed` 0.22.0: the tools and prompts name a place `node` (it was
   `address`; `parent`, `new_parent`, `path` and `workflow` stay as roles), and the seven list tools
   page ten rows with `cursor` and `next_cursor`, search with `query` and, for `list_runs`, filter by
@@ -412,7 +424,7 @@ the sealed variant, in all eight entries), keeping existing entries:
 - `alynki` 0.23.0 and `alynki-sealed` 0.19.0: `/alynki:setup` also asks before
   `update_principal_agent`, so seven tools ask; re-run it on a machine set up earlier to add the
   rule. The pinned-token text offers only an operator-issued token, since the app no longer reveals
-  agent tokens. The tool counts follow the server's 39 tools. As for every sealed version, reinstall
+  agent tokens. The tool counts followed the server's tool list of that release (39 at the time). As for every sealed version, reinstall
   `alynki-local`.
 
 ## Status
