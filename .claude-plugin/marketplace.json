@@ -9,11 +9,6 @@
       "name": "alynki",
       "source": "./alynki-plugin",
       "description": "Loads your organisation's governed context \u2014 policy, product context, and the workflows, checks and runs that define how work is done \u2014 into every session, scoped to your credential"
-    },
-    {
-      "name": "alynki-sealed",
-      "source": "./alynki-sealed-plugin",
-      "description": "Discontinued for now and not part of our product offering at the moment. Sealed variant: a local component (alynki-local) runs on this machine \u2014 it decrypts your Alynki context locally and does chunked saves and paged loads here, so the hosted service serves and stores ciphertext only. Requires alynki-local on PATH"
     }
   ]
 }

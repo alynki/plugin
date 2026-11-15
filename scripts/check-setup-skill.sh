@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Asserts what /alynki:setup promises: the exact set of tools that always ask
-# for approval, in both variants' skills and in the README that documents them,
+# for approval, in the setup skill and in the README that documents them,
 # and that the words around them are not stale. Run from anywhere:
 #
 #   scripts/check-setup-skill.sh
@@ -11,9 +11,7 @@ set -u
 cd "$(dirname "$0")/.." || exit 1
 
 SKILL=alynki-plugin/skills/setup/SKILL.md
-SEALED=alynki-sealed-plugin/skills/setup/SKILL.md
 STD=alynki-plugin/.claude-plugin/plugin.json
-SLD=alynki-sealed-plugin/.claude-plugin/plugin.json
 GATED="grant_principal revoke_principal invite_principal revoke_principal_invite create_principal_agent update_principal_agent revoke_principal_agent"
 
 n=0
@@ -38,13 +36,9 @@ absent_word() { ! grep -qiw -- "$1" "$2"; }
 gate_size() { [ "$(grep -cE '^- `[a-z_]+`$' "$1")" -eq "$2" ]; }
 in_readme_json() { grep -qF "\"mcp__plugin_alynki_alynki__$1\"" README.md; }
 not_in_readme_json() { ! grep -qF "mcp__plugin_alynki_alynki__$1" README.md; }
-# A count in a list item or paragraph is read in the context of the nearest preceding class word: "sealed" before "39 tools" is wrong.
-absent_sealed_39() { ! tr -d '*`' <"$1" | awk '/^[ \t]*$/ || /^[ \t]*#/ || /^[ \t]*[-*][ \t]/ || /\["/ { c = "" } { l = tolower($0); gsub(/[^a-z0-9-]/, " ", l); n = split(l, w, " "); for (i = 1; i <= n; i++) { if (index(w[i], "sealed") > 0) c = "sealed"; else if (w[i] == "server" || w[i] == "pinned" || w[i] == "interactive") c = ""; if (c == "sealed" && (w[i] == "39" || w[i] == "thirty-nine") && (w[i+1] == "tools" || w[i+1] == "prompts")) bad = 1 } } END { exit !bad }'; }
 in_readme_all() { for t in "$@"; do grep -qF "\`$t\`" README.md || return 1; done; }
 named_in_readme() { grep -qF "\`$1\` $2" README.md; }
 
-# Sealed tenants are discontinued (alynki/alynki#1093, 2026-10-20); restore if they return.
-# ok "the two setup skills are byte-identical" cmp -s "$SKILL" "$SEALED"
 
 for t in $GATED; do
   ok "the skill lists $t in the human gate" listed "$t" "$SKILL"
@@ -67,17 +61,8 @@ ok "the standard plugin's token field does not offer a revealed agent token" abs
 ok "the standard plugin's hooks do not offer a revealed agent token" absent 'you revealed' alynki-plugin/hooks/hooks.json
 
 ok "the README names the standard plugin's version" named_in_readme alynki "$(jq -r .version "$STD")"
-# Sealed tenants are discontinued (alynki/alynki#1093, 2026-10-20); restore if they return.
-# ok "the README names the sealed plugin's version" named_in_readme alynki-sealed "$(jq -r .version "$SLD")"
 
-# Sealed tenants are discontinued (alynki/alynki#1093, 2026-10-20); restore if they return.
-# ok "the README does not say the sealed proxy mirrors none of the run surface" absent 'mirrors none of it' README.md
-# Sealed tenants are discontinued (alynki/alynki#1093, 2026-10-20); restore if they return.
-# ok "the README names the run tools the sealed proxy mirrors" in_readme_all load_run load_step load_check save_run save_check create_run release_run
-ok "the README names ALYNKI_AUTH_URL" grep -qF 'ALYNKI_AUTH_URL' README.md
 ok "the README names CLAUDE_CONFIG_DIR, which headers.sh reads" grep -qF 'CLAUDE_CONFIG_DIR' README.md
-# Sealed tenants are discontinued (alynki/alynki#1093, 2026-10-20); restore if they return.
-# ok "the README quotes no sealed count of 39 (the sealed proxy has no start_run: 38 tools, 38 prompts)" absent_sealed_39 README.md
 ok "the README's run-stop note names the states load_run declares (held, paused, terminated, complete)" grep -qF 'held for a person, a limit, paused, terminated, or complete' README.md
 
 # The model header (alynki/alynki#1918): the standard plugin's header script sends the optional `model`
@@ -117,7 +102,6 @@ no_settings_file_sends_none() {
   rm -rf "$d"
   [ "$out" = '{}' ]
 }
-sealed_has_no_model() { ! grep -qF 'ALYNKI_MODEL' alynki-sealed-plugin/.mcp.json && [ "$(jq -r '.userConfig | has("model")' "$SLD")" = "false" ]; }
 declares_model_setting() { [ "$(jq -r '.userConfig.model.type + "/" + (.userConfig.model.required | tostring)' "$1")" = "string/false" ]; }
 # The version carries the release that added the model header or a later one (the floor rises with each release, never falls).
 version_at_least() { [ "$(printf '%s\n%s\n' "$2" "$(jq -r .version "$1")" | sort -t. -k1,1n -k2,2n -k3,3n | head -n1)" = "$2" ]; }
@@ -130,17 +114,10 @@ ok "a model that is not a plain model id is refused: no header is sent for it" m
 ok "the model is never printed: nothing on stderr and no echo of it in the script" model_never_printed
 ok "no settings file sends no header at all" no_settings_file_sends_none
 ok "the standard plugin declares the optional model setting" declares_model_setting "$STD"
-# Sealed tenants are discontinued (alynki/alynki#1093, 2026-10-20); restore if they return.
-# ok "the sealed plugin declares the optional model setting" declares_model_setting "$SLD"
-# Sealed tenants are discontinued (alynki/alynki#1093, 2026-10-20); restore if they return.
-# ok "the sealed plugin passes the model to alynki-local as ALYNKI_MODEL" grep -qF '"ALYNKI_MODEL": "${user_config.model}"' alynki-sealed-plugin/.mcp.json
 ok "the standard plugin's version is at least 0.25.0, the release of the model header" version_at_least "$STD" 0.25.0
-# Sealed tenants are discontinued (alynki/alynki#1093, 2026-10-20); restore if they return.
-# ok "the sealed plugin's version is at least 0.21.0, the release of the model setting" version_at_least "$SLD" 0.21.0
 ok "the README names the X-Alynki-Model header" grep -qF 'X-Alynki-Model' README.md
 ok "the README says the model is never printed" grep -qF 'The model is never printed' README.md
-ok "the README does not name ALYNKI_MODEL, which alynki-local does not read" absent 'ALYNKI_MODEL' README.md
-ok "the sealed plugin passes no ALYNKI_MODEL and declares no model setting" sealed_has_no_model
+ok "the README does not name ALYNKI_MODEL, which the plugin does not read" absent 'ALYNKI_MODEL' README.md
 ok "the README states the trail is delivered once per lease" grep -qF 'The trail is delivered once per lease' README.md
 ok "the README says the trail comes again with start_run or load_run" grep -qF '`start_run` again, or' README.md
 
@@ -148,13 +125,29 @@ ok "the README says the trail comes again with start_run or load_run" grep -qF '
 ok "the README names no address argument (the tools say node)" absent "no address argument|optional address|check.s address|workflow.s address" README.md
 ok "the standard plugin's version is at least 0.26.0, the release of the node rename" version_at_least "$STD" 0.26.0
 
-# The five inherited-check tools (alynki/alynki#2829): named in the README, counted as 44 tools and 44 prompts, the sealed version moves with it.
+# The five inherited-check tools (alynki/alynki#2829): named in the README, counted as 44 tools and 44 prompts.
 ok "the standard plugin's version is at least 0.27.0, the release of the five inherited-check tools" version_at_least "$STD" 0.27.0
-ok "the sealed plugin's version is at least 0.23.0, moving with the standard plugin" version_at_least "$SLD" 0.23.0
 ok "the README names the five inherited-check tools" in_readme_all create_inherited_check list_inherited_checks load_inherited_check move_inherited_check delete_inherited_check
 ok "the README carries no stale interactive count (thirty-nine)" absent_word thirty-nine README.md
 ok "the README counts forty-four interactive tools and prompts" grep -qF 'all **forty-four** tools' README.md
 ok "the README's settings example does not ask before the five new tools" not_in_readme_json create_inherited_check
+
+# The sealed variant is removed (alynki/alynki#3262). The words are assembled from parts so this script never names what it asserts is gone.
+S=seal
+GONE="${S}ed|alynki-local"
+# The one README line allowed to name it is the release note that names the commit which last carried it.
+NOTE="the commit that last carried the ${S}ed variant"
+marketplace_lists_alynki_only() { [ "$(jq -r '[.plugins[].name] | join(",")' .claude-plugin/marketplace.json)" = "alynki" ]; }
+variant_directory_gone() { [ ! -e "alynki-${S}ed-plugin" ]; }
+readme_names_it_only_in_the_note() { ! grep -v -F -- "$NOTE" README.md | grep -qiE -- "$GONE"; }
+note_names_the_commit() { grep -F -- "$NOTE" README.md | grep -qE '[0-9a-f]{40}'; }
+plugin_folder_names_it_nowhere() { ! grep -rqiE --exclude-dir=.git -- "$GONE" alynki-plugin .claude-plugin; }
+ok "the marketplace lists alynki alone" marketplace_lists_alynki_only
+ok "the sealed variant's directory is gone from main" variant_directory_gone
+ok "the README names the sealed variant, its server segment and its local binary nowhere but the release note" readme_names_it_only_in_the_note
+ok "the release note names the commit that last carried the sealed variant (a full 40-character SHA)" note_names_the_commit
+ok "the setup skill, the plugin folder and the marketplace name no sealed variant, server segment or local binary" plugin_folder_names_it_nowhere
+ok "the setup skill recognises one server segment, plugin_alynki_alynki, by literal equality" grep -qF 'exactly one server segment' "$SKILL"
 
 echo "$n assertions, $failed failed"
 [ "$failed" -eq 0 ] || exit 1
