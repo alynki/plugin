@@ -220,6 +220,11 @@ ok "no link points into a private repository" no_private_repository_link
 ok "the plugin README says what the plugin runs, sends and fetches" grep -qF '## What it runs, sends and fetches' alynki-plugin/README.md
 ok "the plugin README holds the token finding for the reviewer" grep -qF 'One setting is held for a reviewer' alynki-plugin/README.md
 
+# The release (alynki/alynki#3264): 0.28.0 is the version that removed the variant and carries the listing; its note says what changed.
+ok "the standard plugin's version is at least 0.28.0, the release of the listing and the directory validation" version_at_least "$STD" 0.28.0
+ok "the 0.28.0 release note says the listing, the hook command form and the counts unchanged" grep -qF 'No tool and no prompt added (the counts are those of the diagram above: 44 tools and 44 prompts' README.md
+ok "the plugin's version is named in the README's release notes" grep -qF "\`alynki\` $(jq -r .version "$STD"):" README.md
+
 echo "$n assertions, $failed failed"
 [ "$failed" -eq 0 ] || exit 1
 floor=${SETUP_CHECK_FLOOR:-0}
