@@ -149,6 +149,41 @@ ok "the release note names the commit that last carried the sealed variant (a fu
 ok "the setup skill, the plugin folder and the marketplace name no sealed variant, server segment or local binary" plugin_folder_names_it_nowhere
 ok "the setup skill recognises one server segment, plugin_alynki_alynki, by literal equality" grep -qF 'exactly one server segment' "$SKILL"
 
+# The listing (alynki/alynki#3263): words from the approved listing kit, the icon, the URLs and the plugin's own README.
+PLUGIN_README=alynki-plugin/README.md
+MKT=.claude-plugin/marketplace.json
+OPENING="From your people to your customers, faster"
+ICON_SHA256=651c242cf20d647a3e2ea0c6e95d852800171637882578882ffe9ffdc624980a
+no_em_dash() { ! grep -q '—' "$@"; }
+descriptions_in_the_sites_register() {
+  [ "$(jq -r '.description | startswith($o)' --arg o "$OPENING" "$STD")" = "true" ] &&
+    [ "$(jq -r '.plugins[0].description | startswith($o)' --arg o "$OPENING" "$MKT")" = "true" ] &&
+    [ "$(jq -r '.description | length' "$STD")" -le 200 ] &&
+    [ "$(jq -r '.description | length' "$MKT")" -le 200 ]
+}
+icon_is_the_approved_png() {
+  [ "$(jq -r .icon "$STD")" = "./.claude-plugin/icon.png" ] &&
+    [ "$({ sha256sum alynki-plugin/.claude-plugin/icon.png 2>/dev/null || shasum -a 256 alynki-plugin/.claude-plugin/icon.png; } | cut -d' ' -f1)" = "$ICON_SHA256" ]
+}
+listing_urls_are_https() { [ "$(jq -r '[.privacyPolicyUrl, .homepage, .repository] | map(startswith("https://")) | all' "$STD")" = "true" ]; }
+words_outside_code() { awk '/^```/ { f = !f; next } !f' "$1" | wc -w | tr -d ' '; }
+plugin_readme_has_40_words() { [ "$(words_outside_code "$PLUGIN_README")" -ge 40 ]; }
+opens_with_what_alynki_is() { grep -v -e '^#' -e '^[[:space:]]*$' "$1" | head -n1 | grep -qF -- "$OPENING"; }
+# shellcheck disable=SC2016 # the backticks are literal Markdown
+readme_install_matches_docs() {
+  grep -qxF '/plugin marketplace add alynki/plugin' "$PLUGIN_README" && grep -qxF '/plugin install alynki@alynki-marketplace' "$PLUGIN_README" &&
+    grep -qF '`/plugin marketplace add alynki/plugin`' README.md && grep -qF '`/plugin install alynki@alynki-marketplace`' README.md && ! grep -q 'reload-plugins' README.md "$PLUGIN_README"
+}
+ok "no em dash in plugin.json, marketplace.json or either README" no_em_dash "$STD" "$MKT" README.md "$PLUGIN_README"
+ok "the plugin and marketplace descriptions open in the site's register and fit 200 characters" descriptions_in_the_sites_register
+ok "plugin.json's icon is the committed approved PNG (sha256 of https://alynki.com/favicon-512.png)" icon_is_the_approved_png
+ok "plugin.json carries privacyPolicyUrl, homepage and repository as https URLs" listing_urls_are_https
+ok "the plugin's own README has 40 words or more outside code blocks" plugin_readme_has_40_words
+ok "the plugin's own README opens with what Alynki is" opens_with_what_alynki_is "$PLUGIN_README"
+ok "the repository README opens in the same register" opens_with_what_alynki_is README.md
+ok "the install commands match https://alynki.com/docs/ (two commands, no reload step)" readme_install_matches_docs
+ok "the README says each step output and check evaluation is saved with a reasoning" grep -qF 'Each step output and check evaluation is saved with a reasoning' README.md
+
 echo "$n assertions, $failed failed"
 [ "$failed" -eq 0 ] || exit 1
 floor=${SETUP_CHECK_FLOOR:-0}
