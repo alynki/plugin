@@ -1,12 +1,12 @@
 # Alynki plugin
 
-> Knowledge is inherited, not rediscovered.
+From your people to your customers, faster and with higher quality. Alynki is the business context layer your people and their AI agents work from. AI doesn't replace your people, it empowers them.
 
-The Claude Code plugin for Alynki, the business context layer. It loads your organisation's
-governed context into every session: the policy and product context for the scope your credential
-holds and, where that scope sits in a workflow, the steps, checks and runs that define how the work
-is done. Alynki delivers to a principal only what that principal is granted; it does not constrain
-what an agent obtains from other sources.
+Alynki requires an Alynki account. Request access at alynki.com/contact. Setup and examples: alynki.com/docs.
+
+To start in Claude Code, run `/plugin marketplace add alynki/plugin` and then `/plugin install alynki@alynki-marketplace`. The connection is bundled, so no other step is needed, and you sign in with your own identity the first time you use Alynki (*Install*).
+
+This is the Claude Code plugin for Alynki. It loads your organisation's context into every session: the policy and product context for the scope your credential holds and, where that scope sits in a workflow, the steps, checks and runs that define how the work is done. Alynki delivers to a principal only what that principal is granted; it does not constrain what an agent obtains from other sources.
 
 One plugin ships from this marketplace: **`alynki`**.
 
@@ -64,7 +64,6 @@ the one its controller issues it, and never sees a sign-in prompt.
 ```
 /plugin marketplace add alynki/plugin
 /plugin install alynki@alynki-marketplace
-/reload-plugins
 ```
 
 That is the whole install: **the MCP connection is bundled**, with no `claude mcp add` step.
@@ -192,6 +191,11 @@ Key: solid arrow, a request; dashed arrow, a reply; the loop ends at a stop.
   `load_run`, returns the records again (after a compaction, for instance). A session that does not
   hold the lease gets the definition alone, and a save before the first load is refused with the
   call to make.
+- **Each step output and check evaluation is saved with a reasoning.** `save_run` takes a
+  `reasoning` with every `output`, and `save_check` with every `output`, a human check's included:
+  one plain paragraph of 10 to 80 words saying why the work was done or the verdict reached, not
+  the output restated. Nothing is saved without it, and the run's record prints it beside the output
+  or evaluation.
 - **A human check is decided in the app only, by a person, never over MCP**, by any credential.
   `save_check` records the evaluation and hands the run to a person; deciding it (`approved`) is
   refused and says so.
