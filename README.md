@@ -137,10 +137,9 @@ Key: diamond, a decision made by the server; rectangle, the surface a session is
   `cursor` of `load_context`, `load_step` and `load_check`. Only an interactive session saves a large
   body in staged chunks (`mode` `stage`, then `commit`); a pinned `save_context` has no staged mode
   and takes the body whole. The eight list tools answer ten rows a page: narrow with `query`, `state`
-  or `node` and follow `next_cursor`. The tool descriptions and prompts carry the exact rules. What each tool does,
-  and how confirm tokens, the run lease, the context token, run holds and non-composing reads work,
-  is the server's contract: see `alynki/alynki` `docs/architecture/run-continuation.md` and
-  `docs/architecture/tool-descriptions.md`.
+  or `node` and follow `next_cursor`. The tool descriptions and prompts the server serves carry the exact rules for what each tool
+  does, and for how confirm tokens, the run lease, the context token, run holds and non-composing
+  reads work.
 - `SessionStart` and `SubagentStart` hooks that instruct every session, and every subagent, to call
   `load_context` first (`SessionStart` emits both `initialUserMessage` and `additionalContext`;
   `SubagentStart` emits `additionalContext`). The text names only `load_context`, which every
@@ -279,6 +278,11 @@ To grant it by hand, add to `~/.claude/settings.json`, keeping existing entries:
 }
 ```
 
+## What the plugin runs, sends and fetches
+
+The plugin's own [README](alynki-plugin/README.md) lists everything it runs, sends or fetches,
+including the one setting held in `settings.json` (*What it runs, sends and fetches*).
+
 ## Release notes
 
 - `alynki` 0.28.0: the marketplace offers `alynki` alone, because sealed tenants are discontinued for now. a4bafebd10828a84b9424352121ad0464d3cbe23 is the commit that last carried the sealed variant (`alynki-sealed`, in `alynki-sealed-plugin/`), and git history keeps it.
@@ -314,14 +318,14 @@ To grant it by hand, add to `~/.claude/settings.json`, keeping existing entries:
   is handed to be identical to the URL it dialled, so one shared URL and one shared resource
   identifier are the same decision. For development against a local server, make an **uncommitted**
   working-copy change: `main` only ever carries production.
-- **Visibility:** this repository is **public** (`alynki/github-infrastructure`'s
-  `repositories.tf`). A plugin marketplace must be installable without git access to a private
-  Alynki repository, and this one carries nothing that needs it (*Content policy*).
+- **Visibility:** this repository is **public**. A plugin marketplace must be installable without
+  git access to a private Alynki repository, and this one carries nothing that needs it (*Content
+  policy*).
 
 ## Content policy: read before adding anything
 
 **This repository is public.** It exists so the plugin can be installed without access to
-`alynki/alynki`, which is private, and contains **only** the plugin and its marketplace manifest.
+Alynki's private repositories, and contains **only** the plugin and its marketplace manifest.
 The following are **explicitly excluded** and must never be added: VISION, architecture documents,
 feature specifications, patent material, the risk register, competitor analysis, anything carrying
 a confidentiality banner. CI greps every push for the banner and fails the build if one appears.
