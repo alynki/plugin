@@ -1,59 +1,42 @@
 # Alynki plugin
 
-> Knowledge is inherited, not rediscovered.
+From your people to your customers, faster and with higher quality. Alynki is the business context layer your people and their AI agents work from. AI doesn't replace your people, it empowers them.
 
-> Sealed tenants are discontinued for now and are not part of our product offering at the moment; they may be revisited if a customer asks.
+Alynki requires an Alynki account. Request access at alynki.com/contact. Setup and examples: alynki.com/docs.
 
-The Claude Code plugin for Alynki, the business context layer. It loads your organisation's
-governed context into every session: the policy and product context for the scope your credential
-holds and, where that scope sits in a workflow, the steps, checks and runs that define how the work
-is done. Alynki delivers to a principal only what that principal is granted; it does not constrain
-what an agent obtains from other sources.
+To start in Claude Code, run `/plugin marketplace add alynki/plugin` and then `/plugin install alynki@alynki-marketplace`. The connection is bundled, so no other step is needed, and you sign in with your own identity the first time you use Alynki (*Install*).
 
-Two variants ship from this marketplace: **`alynki`** (the standard install) and
-**`alynki-sealed`** (the sealed variant, discontinued for now: context is decrypted locally on your
-machine). Install `alynki`; `alynki-sealed` is kept for the record and is not offered at the moment.
+This is the Claude Code plugin for Alynki. It loads your organisation's context into every session: the policy and product context for the scope your credential holds and, where that scope sits in a workflow, the steps, checks and runs that define how the work is done. Alynki delivers to a principal only what that principal is granted; it does not constrain what an agent obtains from other sources.
+
+One plugin ships from this marketplace: **`alynki`**.
 
 ## Repository layout
 
 - [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json): the marketplace
-  `alynki-marketplace`, listing both plugins.
+  `alynki-marketplace`, listing the plugin.
 - `alynki-plugin/` (`alynki`): an HTTP MCP connection, the `bin/headers.sh` header helper, the
   session hooks and the [`setup` skill](alynki-plugin/skills/setup/SKILL.md).
-- `alynki-sealed-plugin/` (`alynki-sealed`): a stdio MCP connection to `alynki-local`, the session
-  hooks and the [`setup` skill](alynki-sealed-plugin/skills/setup/SKILL.md).
-
-The two `setup/SKILL.md` files are byte-identical **by design**: each plugin is installed alone and
-cannot reference a file outside its own directory. Change both together.
 
 ## Credential paths
 
-Both variants offer the same two paths: sign in with your own identity, or hold a pinned token. A
-pinned token always wins when both are present.
+There are two paths: sign in with your own identity, or hold a pinned token. A pinned token always
+wins when both are present.
 
 ```mermaid
 ---
-title: Credential paths, by variant
+title: Credential paths
 ---
 graph TB
   cc["Claude Code: MCP client"]
   srv["alynki-mcp: https://mcp.alynki.com/mcp"]
   auth["Alynki authorization server: https://auth.alynki.com"]
 
-  subgraph std["alynki (standard): HTTP MCP connection"]
+  subgraph std["alynki: HTTP MCP connection"]
     helper["bin/headers.sh: headersHelper"]
     tok{"Pinned token in settings.json pluginConfigs?"}
     hdr["Emits Authorization: Bearer token, and X-Alynki-Model when the model setting is present"]
     none["Emits an empty object, or only X-Alynki-Model when the model setting is present"]
     oauth["Claude Code OAuth 2.1 discovery and browser sign-in"]
-  end
-
-  subgraph sld["alynki-sealed: stdio MCP connection"]
-    local["alynki-local: local process, decrypts locally"]
-    envtok{"ALYNKI_TOKEN set?"}
-    store[("Credential store: OS keychain or 0600 file")]
-    login["alynki-local login: run once by the user"]
-    err["Tool error naming alynki-local login"]
   end
 
   cc -->|"exec at connect, reconnect, and after a 401 or 403"| helper
@@ -65,34 +48,22 @@ graph TB
   srv -->|"HTTPS 401 when no valid token"| oauth
   oauth -->|"HTTPS OAuth 2.1 and PKCE in the browser"| auth
   oauth -->|"later HTTPS MCP calls carry the OAuth token"| srv
-
-  cc -->|"MCP over stdio"| local
-  local -->|"at startup: tokenSource reads ALYNKI_TOKEN"| envtok
-  envtok -->|"yes: HTTPS MCP, Bearer ALYNKI_TOKEN"| srv
-  envtok -->|"no: the stored login, resolved at each call"| store
-  store -->|"found: HTTPS MCP, Bearer token"| srv
-  store -->|"none stored"| err
-  err -->|"tool result over stdio"| cc
-  login -->|"HTTPS RFC 8252 loopback flow and PKCE"| auth
-  login -->|"writes the token pair"| store
 ```
 
-Key: rectangle, a process or message; diamond, a decision; cylinder, a credential store on this
-machine; the two boxed groups are the two variants.
+Key: rectangle, a process or message; diamond, a decision; the boxed group is the plugin.
 
 A static `headers.Authorization` key in `.mcp.json` would disable Claude Code's OAuth fallback
-unconditionally, even when its value is empty, so the standard plugin decides at connection time
+unconditionally, even when its value is empty, so the plugin decides at connection time
 with a `headersHelper` script. The script reads the token with `jq`; without `jq` on `PATH` it emits
 no header and the session signs in instead. The same script sends the session's model as a second
 header (see *The model header*). An agent working a run unattended has one credential,
 the one its controller issues it, and never sees a sign-in prompt.
 
-## Install: `alynki` (standard)
+## Install
 
 ```
 /plugin marketplace add alynki/plugin
 /plugin install alynki@alynki-marketplace
-/reload-plugins
 ```
 
 That is the whole install: **the MCP connection is bundled**, with no `claude mcp add` step.
@@ -120,106 +91,32 @@ consumes. A controller that launches a session on a chosen model writes the sett
 session's private settings; a person's own session leaves it blank and sends none. The header is a
 consistency control, not a boundary: a call without it is not checked by the server.
 
-## Install: `alynki-sealed`
-
-> Sealed tenants are discontinued for now and are not part of our product offering at the moment; they may be revisited if a customer asks.
-
-Kept as a record of what the variant is; it is not offered at the moment. **A local process, `alynki-local`, runs on your
-machine**: Claude Code launches it for each session, it calls the same hosted endpoint and decrypts
-your context locally. The hosted service stores and serves ciphertext only; your organisation key
-never leaves this machine.
-
-⚠️ **The trade-off: sealing works only in clients that can run a local process**, Claude Code and
-other CLI-class clients. **Hosted chat apps cannot use it:** claude.ai on the web, Desktop and
-mobile connect to the hosted endpoint directly, so a sealed organisation's context is unavailable
-there, and the Alynki browser app is unavailable to a sealed organisation too. An organisation that
-needs those surfaces uses the standard variant.
-
-`alynki-local` must be on your `PATH` before the plugin can serve context. Your Alynki operator
-provides the binary for your platform; installing the plugin does not install it. Confirm:
-
-```sh
-which alynki-local     # must print a path
-```
-
-(Building from source, `go install ./cmd/alynki-local` from an `alynki/server` checkout, is an
-operator or developer path, not a colleague path.) Then:
-
-```
-/plugin marketplace add alynki/plugin
-/plugin install alynki-sealed@alynki-marketplace
-/reload-plugins
-```
-
-Installing prompts for four values, **all optional** (each can instead be set up by running
-`alynki-local` once from a terminal). ⚠️ **No tenant is asked for**: it is resolved from your
-credential, server-side (*Status*).
-
-- **Alynki API token**: leave blank and run `alynki-local login` to sign in with your own
-  identity. A pinned token, when set, wins over a stored login. A token entered here is held in
-  Claude Code's secure credential storage; the `alynki-local login` store (your OS keychain, with a
-  file fallback) is the better place for a long-lived credential.
-- **Alynki organisation key** and **Alynki key id**: leave both blank and run
-  `alynki-local key import` (with `ALYNKI_KEY` and `ALYNKI_KEY_ID` set in your shell), so the key
-  lives in the `alynki-local` store and never in this plugin's configuration.
-
-Non-interactive form:
-
-```
-claude plugin install alynki-sealed@alynki-marketplace --config token=<token> --config key=<key> --config key_id=<key-id>
-```
-
 ## Environment variables
 
-Every variable the plugins and `alynki-local` read, and where:
+Every variable the plugin reads, and where:
 
-- `ALYNKI_URL`: the hosted MCP endpoint, `https://mcp.alynki.com/mcp` (a URL with a tenant path
-  segment is refused). `alynki-local` reads it at startup and in `alynki-local login` and
-  `alynki-local logout`, each of which fails without it. The sealed plugin's `.mcp.json` sets it for
-  the session; **a terminal command needs it set in your shell**:
-  `ALYNKI_URL=https://mcp.alynki.com/mcp alynki-local login`.
-- `ALYNKI_AUTH_URL`: the authorization server used to sign in, `https://auth.alynki.com` when unset.
-  `alynki-local` reads it in `login`, `logout` and when it refreshes a stored login.
-- `ALYNKI_TOKEN`: a pinned token. `alynki-local` reads it at startup; when set it wins over a stored
-  login. The sealed plugin's `.mcp.json` fills it from the plugin's token field.
-- `ALYNKI_KEY` and `ALYNKI_KEY_ID`: the organisation key and its id, both or neither.
-  `alynki-local` reads them at startup, in `alynki-local key import` (which stores them) and in
-  `alynki-local seal`; when set they override the stored key. The sealed plugin's `.mcp.json` fills
-  them from the plugin's key fields.
-- `CLAUDE_CONFIG_DIR`: where Claude Code keeps `settings.json`. The standard plugin's
+- `CLAUDE_CONFIG_DIR`: where Claude Code keeps `settings.json`. The plugin's
   `bin/headers.sh` reads the pinned token and the model setting from
   `$CLAUDE_CONFIG_DIR/settings.json`, and from `~/.claude/settings.json` when it is unset.
-- `CLAUDE_PLUGIN_ROOT`: set by Claude Code to the installed plugin's directory; the standard
-  plugin's `.mcp.json` uses it to locate `bin/headers.sh`.
-
-`alynki-local` keeps its stored login and key in the `alynki` directory under your operating
-system's user configuration directory (the OS keychain first, with a file fallback).
+- `CLAUDE_PLUGIN_ROOT`: set by Claude Code to the installed plugin's directory; the plugin's
+  `.mcp.json` uses it to locate `bin/headers.sh`.
 
 ## What it installs
 
 ```mermaid
 ---
-title: What a session is offered, by credential class and variant
+title: What a session is offered, by credential class
 ---
 graph TB
   cls{"Credential class"}
-  pinv{"Variant"}
-  intv{"Variant"}
-  p8["alynki, pinned: 8 tools, no prompts, no node argument"]
-  ps["alynki-sealed, pinned: load_context and save_context only"]
-  i44["alynki, interactive: 44 tools and 44 prompts, optional node"]
-  i43["alynki-sealed, interactive: 43 tools and 43 prompts, no start_run, no work-run"]
+  p8["Pinned token, an agent: 8 tools, no prompts, no node argument"]
+  i44["Interactive token, a person: 44 tools and 44 prompts, optional node"]
 
-  cls -->|"tools/list over MCP: pinned token, an agent"| pinv
-  cls -->|"tools/list over MCP: interactive token, a human"| intv
-  pinv -->|"HTTP connection"| p8
-  pinv -->|"stdio connection via alynki-local"| ps
-  intv -->|"HTTP connection"| i44
-  intv -->|"stdio connection via alynki-local"| i43
+  cls -->|"tools/list over MCP: pinned token"| p8
+  cls -->|"tools/list over MCP: interactive token"| i44
 ```
 
-Key: diamond, a decision made by the server (class) or by the plugin you installed (variant);
-rectangle, the surface a session is offered.
+Key: diamond, a decision made by the server; rectangle, the surface a session is offered.
 
 - **Pinned** (agent) credentials, including one working a run unattended, are offered exactly
   **eight tools**: `load_context`, `save_context`, `start_run`, `load_run`, `load_step`,
@@ -240,36 +137,18 @@ rectangle, the surface a session is offered.
   `cursor` of `load_context`, `load_step` and `load_check`. Only an interactive session saves a large
   body in staged chunks (`mode` `stage`, then `commit`); a pinned `save_context` has no staged mode
   and takes the body whole. The eight list tools answer ten rows a page: narrow with `query`, `state`
-  or `node` and follow `next_cursor`. The tool descriptions and prompts carry the exact rules. What each tool does,
-  and how confirm tokens, the run lease, the context token, run holds and non-composing reads work,
-  is the server's contract: see `alynki/alynki` `docs/architecture/run-continuation.md` and
-  `docs/architecture/tool-descriptions.md`.
-- The standard connection goes straight to the hosted server. The sealed one goes to `alynki-local`,
-  which calls the hosted server, decrypts the result, and does the chunking and paging on this
-  machine, so the hosted service sees only whole ciphertext. **`alynki-local` mirrors the run
-  tools of an interactive credential, except `start_run`**: `load_run`, `load_step`, `load_check`,
-  `save_run`, `save_check` (it decrypts what you read and encrypts what you write), `create_run`
-  and `release_run`, plus `list_runs` and `delete_run`. It does **not** mirror `start_run`, nor the
-  `work-run` prompt that calls it: starting a run, and the run lease, controller and agents built
-  on it, serve unsealed organisations only.
+  or `node` and follow `next_cursor`. The tool descriptions and prompts the server serves carry the exact rules for what each tool
+  does, and for how confirm tokens, the run lease, the context token, run holds and non-composing
+  reads work.
 - `SessionStart` and `SubagentStart` hooks that instruct every session, and every subagent, to call
   `load_context` first (`SessionStart` emits both `initialUserMessage` and `additionalContext`;
   `SubagentStart` emits `additionalContext`). The text names only `load_context`, which every
   credential class holds.
 
-⚠️ A new sealed capability reaches you only with a redistributed `alynki-local` binary, wording
-included: the sealed variant declares its tool descriptions, renders its prompts and answers the
-server's `instructions` string *locally*. Nothing warns you of a wording-only change, because the
-staleness nudge compares tool **schemas** byte-for-byte, so an older binary keeps serving the stale
-wording. **Reinstall `alynki-local` whenever the sealed plugin's version moves.** A genuine schema
-change is the one case an old binary catches itself: it withholds the changed tool, with one
-`OUT OF DATE` log line, until rebuilt. A changed tool *result* needs no rebuild: results are relayed
-from the hosted server verbatim.
-
 ## Working a run
 
 A run (a workflow's steps and checks, in progress against one label) is worked the same way by a
-person or an agent, in the standard variant.
+person or an agent.
 
 ```mermaid
 ---
@@ -310,7 +189,12 @@ Key: solid arrow, a request; dashed arrow, a reply; the loop ends at a stop.
   trail was already delivered, which is faster and uses far fewer tokens. `start_run` again, or
   `load_run`, returns the records again (after a compaction, for instance). A session that does not
   hold the lease gets the definition alone, and a save before the first load is refused with the
-  call to make. This is the standard variant only: the sealed variant has no `start_run`.
+  call to make.
+- **Each step output and check evaluation is saved with a reasoning.** `save_run` takes a
+  `reasoning` with every `output`, and `save_check` with every `output`, a human check's included:
+  one plain paragraph of 10 to 80 words saying why the work was done or the verdict reached, not
+  the output restated. Nothing is saved without it, and the run's record prints it beside the output
+  or evaluation.
 - **A human check is decided in the app only, by a person, never over MCP**, by any credential.
   `save_check` records the evaluation and hands the run to a person; deciding it (`approved`) is
   refused and says so.
@@ -329,7 +213,7 @@ Run once, in any session:
 /alynki:setup
 ```
 
-(`/alynki-sealed:setup` for the sealed variant.) It shows the edit, then adds to your own
+It shows the edit, then adds to your own
 `~/.claude/settings.json`, machine-wide:
 
 - the wildcard `mcp__plugin_alynki_alynki__*` to `permissions.allow`, covering every Alynki tool
@@ -373,8 +257,7 @@ client may not prompt at all.
 ⚠️ **This command still prompts once, for its own write.** `~/.claude` is a protected path, so no
 allow rule suppresses that prompt. It removes every *subsequent* Alynki prompt, not its own.
 
-To grant it by hand, add to `~/.claude/settings.json` (substitute `plugin_alynki-sealed_alynki` for
-the sealed variant, in all eight entries), keeping existing entries:
+To grant it by hand, add to `~/.claude/settings.json`, keeping existing entries:
 
 ```json
 {
@@ -395,54 +278,62 @@ the sealed variant, in all eight entries), keeping existing entries:
 }
 ```
 
+## What the plugin runs, sends and fetches
+
+The plugin's own [README](alynki-plugin/README.md) lists everything it runs, sends or fetches,
+including the one setting held in `settings.json` (*What it runs, sends and fetches*).
+
 ## Release notes
 
-- `alynki` 0.27.0 and `alynki-sealed` 0.23.0: the inherited-check tools added for interactive credentials,
+- `alynki` 0.28.0: the marketplace offers `alynki` alone, because sealed tenants are discontinued for now. a4bafebd10828a84b9424352121ad0464d3cbe23 is the commit that last carried the sealed variant (`alynki-sealed`, in `alynki-sealed-plugin/`), and git history keeps it.
+  Also in 0.28.0: the listing words come from the approved listing kit, with `icon` (a copy of
+  https://alynki.com/favicon-512.png inside the plugin), `privacyPolicyUrl`, `homepage` and
+  `repository` in `plugin.json`; the plugin folder has its own README and LICENSE; the hook commands
+  are `${CLAUDE_PLUGIN_ROOT}` paths and the hook text is unchanged; the README says what the plugin
+  runs, sends and fetches and that each step output and check evaluation is saved with a reasoning.
+  No tool and no prompt added (the counts are those of the diagram above: 44 tools and 44 prompts
+  for a person, 8 tools for an agent), and the `/alynki:setup` list of seven asking tools is
+  unchanged.
+- `alynki` 0.27.0: the inherited-check tools added for interactive credentials,
   `create_inherited_check`, `list_inherited_checks`, `load_inherited_check`,
   `move_inherited_check` and `delete_inherited_check` (the counts are those of the diagram above;
   the agent set stays eight). `load_step`, `load_check`, `save_run` and `save_check` take labels
   (`workflow`, `run` or `label`, `step`, `check`). The `/alynki:setup` list of seven asking tools is
-  unchanged. Update `alynki` to 0.27.0; `alynki-sealed` 0.23.0 is a version bump only. As for every
-  sealed version, reinstall `alynki-local`.
-- `alynki` 0.26.0 and `alynki-sealed` 0.22.0: the tools and prompts name a place `node` (it was
+  unchanged.
+- `alynki` 0.26.0: the tools and prompts name a place `node` (it was
   `address`; `parent`, `new_parent`, `path` and `workflow` stay as roles), and the seven list tools
   page ten rows with `cursor` and `next_cursor`, search with `query` and, for `list_runs`, filter by
   `state`. No tool and no prompt added (the counts are those of the diagram above), and the
-  `/alynki:setup` list of seven asking tools is unchanged. As for every sealed version, reinstall
-  `alynki-local`.
-- `alynki` 0.25.0 and `alynki-sealed` 0.21.0: a new optional **model** setting beside the token in
-  the standard plugin, which sends it as the second header `X-Alynki-Model` and sends nothing when
-  it is absent; the sealed plugin has no model setting (sealed tenants are discontinued for now, and
-  `alynki-local` does not read one). The README states that the trail now arrives once per lease.
-  No tool and no prompt added (the counts are those of the diagram above). As for every sealed
-  version, reinstall `alynki-local`.
-- `alynki` 0.24.0 and `alynki-sealed` 0.20.0: no tool and no prompt added (the counts are those
+  `/alynki:setup` list of seven asking tools is unchanged.
+- `alynki` 0.25.0: a new optional **model** setting beside the token, which sends it as the second
+  header `X-Alynki-Model` and sends nothing when it is absent. The README states that the trail now
+  arrives once per lease. No tool and no prompt added (the counts are those of the diagram above).
+- `alynki` 0.24.0: no tool and no prompt added (the counts are those
   of the diagram above); the tool descriptions of `load_run`, `list_runs`,
   `list_pending_checks`, `start_run`, `release_run`, `create_trigger`, `create_workflow`,
   `update_workflow` and `load_workflow` follow the server, so a run's standing can now be paused or
-  terminated. As for every sealed version, reinstall `alynki-local`.
-- `alynki` 0.23.0 and `alynki-sealed` 0.19.0: `/alynki:setup` also asks before
+  terminated.
+- `alynki` 0.23.0: `/alynki:setup` also asks before
   `update_principal_agent`, so seven tools ask; re-run it on a machine set up earlier to add the
   rule. The pinned-token text offers only an operator-issued token, since the app no longer reveals
-  agent tokens. The tool counts followed the server's tool list of that release (39 at the time). As for every sealed version, reinstall
-  `alynki-local`.
+  agent tokens. The tool counts followed the server's tool list of that release (39 at the time).
 
 ## Status
 
 - **One shared endpoint: `https://mcp.alynki.com/mcp`.** Your tenant is resolved server-side from
-  the credential, never from the URL, so **neither variant asks for a tenant** and both `.mcp.json`
-  files carry the same literal URL. ⚠️ **RFC 9728 §3.3 requires** the `resource` identifier a client
+  the credential, never from the URL, so **the plugin asks for no tenant** and its `.mcp.json`
+  carries one literal URL. ⚠️ **RFC 9728 §3.3 requires** the `resource` identifier a client
   is handed to be identical to the URL it dialled, so one shared URL and one shared resource
   identifier are the same decision. For development against a local server, make an **uncommitted**
   working-copy change: `main` only ever carries production.
-- **Visibility:** this repository is **public** (`alynki/github-infrastructure`'s
-  `repositories.tf`). A plugin marketplace must be installable without git access to a private
-  Alynki repository, and this one carries nothing that needs it (*Content policy*).
+- **Visibility:** this repository is **public**. A plugin marketplace must be installable without
+  git access to a private Alynki repository, and this one carries nothing that needs it (*Content
+  policy*).
 
 ## Content policy: read before adding anything
 
 **This repository is public.** It exists so the plugin can be installed without access to
-`alynki/alynki`, which is private, and contains **only** the plugin and its marketplace manifest.
+Alynki's private repositories, and contains **only** the plugin and its marketplace manifest.
 The following are **explicitly excluded** and must never be added: VISION, architecture documents,
 feature specifications, patent material, the risk register, competitor analysis, anything carrying
 a confidentiality banner. CI greps every push for the banner and fails the build if one appears.

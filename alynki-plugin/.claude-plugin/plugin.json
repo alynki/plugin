@@ -1,21 +1,25 @@
 {
   "name": "alynki",
-  "version": "0.27.0",
-  "description": "Alynki \u2014 the business context layer: governed context, workflows and checks, inherited into every session.",
+  "version": "0.28.0",
+  "description": "From your people to your customers, faster and with higher quality. Your people and their AI agents work from one business context layer, and every step is checked against it.",
   "author": {
     "name": "Alynki"
   },
+  "homepage": "https://alynki.com",
+  "repository": "https://github.com/alynki/plugin",
+  "privacyPolicyUrl": "https://alynki.com/privacy/",
+  "icon": "./.claude-plugin/icon.png",
   "userConfig": {
     "token": {
       "type": "string",
-      "title": "Alynki API token (optional \u2014 leave blank to sign in instead)",
-      "description": "A pinned token issued by your Alynki operator. Leave this blank to sign in with your own identity instead \u2014 Claude Code will offer OAuth on first use. A configured token is stored in this plugin's settings.json, not the OS keychain, since the value must be readable by this plugin's headersHelper script.",
+      "title": "Alynki API token (optional, leave blank to sign in instead)",
+      "description": "A pinned token issued by your Alynki operator. Leave this blank to sign in with your own identity instead: Claude Code will offer OAuth on first use. A configured token is stored in this plugin's settings.json, not the OS keychain, since the value must be readable by this plugin's headersHelper script.",
       "sensitive": false,
       "required": false
     },
     "model": {
       "type": "string",
-      "title": "Alynki model (optional \u2014 set by your controller, leave blank otherwise)",
+      "title": "Alynki model (optional, set by your controller, leave blank otherwise)",
       "description": "The model this session runs on, for example claude-sonnet-5-5. When set, it is sent with every call as the X-Alynki-Model header; when blank, no header is sent. A controller that launches a session writes it for you. Like the token, it is stored in this plugin's settings.json so that the header script can read it.",
       "sensitive": false,
       "required": false
