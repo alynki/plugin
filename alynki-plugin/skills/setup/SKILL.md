@@ -29,20 +29,16 @@ user-defined server literally named `alynki`, or a same-named plugin installed f
 marketplace, produces tool names indistinguishable by pattern from Alynki's own. **A rule that
 matches on "looks like Alynki" would grant a stranger's server.**
 
-So this skill recognises **exactly two server segments, by literal string equality, and nothing
-else**:
+So this skill recognises **exactly one server segment, by literal string equality, and nothing
+else**: `plugin_alynki_alynki`.
 
-- `plugin_alynki_alynki` — the standard plugin
-- `plugin_alynki-sealed_alynki` — the sealed plugin
-
-Any MCP tool in this session whose name is not `mcp__plugin_alynki_alynki__<tool>` or
-`mcp__plugin_alynki-sealed_alynki__<tool>` is out of scope, however similar its name looks. Do not
-widen this list, and do not infer a third form.
+Any MCP tool in this session whose name is not `mcp__plugin_alynki_alynki__<tool>` is out of scope,
+however similar its name looks. Do not widen this, and do not infer a second form.
 
 ## The human gate — seven tools that always ask
 
 These seven tools change who has access to an organisation's context, or manage the agents that act
-in it. Each gets an exact-name rule in `permissions.ask`, under every server segment found in
+in it. Each gets an exact-name rule in `permissions.ask`, under the server segment found in
 step 1:
 
 - `grant_principal`
@@ -53,10 +49,7 @@ step 1:
 - `update_principal_agent`
 - `revoke_principal_agent`
 
-For the standard plugin that is `mcp__plugin_alynki_alynki__grant_principal` and so on; for the
-sealed plugin, `mcp__plugin_alynki-sealed_alynki__grant_principal` and so on. The sealed plugin gets
-all seven too, `create_principal_agent` included, although the server refuses that tool on a sealed
-tenant — the two plugins carry the same gate.
+That is `mcp__plugin_alynki_alynki__grant_principal` and so on.
 
 Claude Code evaluates `deny`, then `ask`, then `allow`, so a matching ask rule prompts even though
 the wildcard allow also matches. The list is exactly these seven: do not add to it, drop from it, or
@@ -64,26 +57,24 @@ write it as a pattern.
 
 ## Steps
 
-1. **Enumerate this session's tools** and keep exactly those matching one of the two forms above,
-   by literal prefix equality. If a session has both (unusual, but possible), both are in scope.
+1. **Enumerate this session's tools** and keep exactly those matching the form above, by literal
+   prefix equality.
 
-   If none match, stop and tell the user neither Alynki plugin is loaded in this session.
+   If none match, stop and tell the user the Alynki plugin is not loaded in this session.
 
 2. **Read `~/.claude/settings.json`.** If it does not exist, treat it as `{}`. If it exists but is
    not valid JSON, stop and say so — never overwrite a file you could not parse.
 
-3. **For each server segment found in step 1, add one wildcard entry to `permissions.allow`**:
-   `mcp__plugin_alynki_alynki__*` for the standard plugin, `mcp__plugin_alynki-sealed_alynki__*` for
-   the sealed plugin. One rule per server present, not one per tool — a tool the server adds later is
-   covered without this skill needing to run again. This is a deliberate choice: the server-segment
+3. **Add one wildcard entry to `permissions.allow`**: `mcp__plugin_alynki_alynki__*`. One rule, not
+   one per tool — a tool the server adds later is covered without this skill needing to run again. This is a deliberate choice: the server-segment
    match in step 1 is what stops the rule ever reaching a server that is not Alynki's; within that
    boundary, a future Alynki tool is granted the moment it exists rather than reviewed individually.
 
-   **Then, for the same server segments, add the seven ask rules** of *The human gate* to
+   **Then add the seven ask rules** of *The human gate* to
    `permissions.ask` — exact names, `mcp__<segment>__<tool>`, never a wildcard.
 
    Create `permissions`, `permissions.allow` and `permissions.ask` if absent. Preserve every existing
-   entry and every other key in the file. Skip a server whose wildcard rule is already present, or
+   entry and every other key in the file. Skip the wildcard if it is already present, or
    already covered by an existing rule; skip each ask rule already present as that exact string. A
    machine holding only the wildcard, or the wildcard and fewer ask rules, from an earlier run is
    missing ask rules: add each missing one and no other — that machine is upgraded, not reported as
@@ -91,15 +82,14 @@ write it as a pattern.
 
 4. **Check `permissions.deny` and `permissions.ask`** (in this file and, if readable, project and
    managed settings) for anything that would shadow the wildcard just granted — those outrank
-   `allow`. **Exempt exactly the seven ask rules of *The human gate*, for the server segments found in
-   step 1**: they are this skill's own, and prompting on those tools is their purpose, not a failed
+   `allow`. **Exempt exactly the seven ask rules of *The human gate***: they are this skill's own, and prompting on those tools is their purpose, not a failed
    grant. Any other matching deny or ask rule — including an ask rule on a different Alynki tool, or
    one written as a pattern — name it and say the grant will not take effect for the tools it
    matches, rather than reporting uniform success.
 
 5. **Show the resulting `permissions.allow` and `permissions.ask`** and apply the edit.
 
-6. **Confirm what changed:** which server wildcards were added and which were already present;
+6. **Confirm what changed:** whether the wildcard was added or was already present;
    which ask rules were added and which were already present; whether anything is shadowed by a
    deny or ask rule other than the seven exempted in step 4; and that the grant is machine-wide,
    covers every current and future Alynki tool, prompts before each call to the seven gated tools, and
@@ -111,7 +101,7 @@ write it as a pattern.
   managed settings.
 - Change no key other than `permissions.allow` and `permissions.ask`, and within `permissions.ask`
   add only the seven rules of *The human gate*. Never remove or rewrite an existing entry in either.
-- Match server segments by literal equality against the two forms above. Never a substring or
+- Match the server segment by literal equality against the form above. Never a substring or
   pattern match — the wildcard's safety depends entirely on this match being exact.
 - The wildcard's scope ends at `__`: write `mcp__plugin_alynki_alynki__*`, never a rule that could
   also match a different server segment.

@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: The setup skill's ask rules, both variants and the README
+      - name: The setup skill's ask rules, and the README
         env:
-          SETUP_CHECK_FLOOR: "52"
+          SETUP_CHECK_FLOOR: "55"
         run: scripts/check-setup-skill.sh
