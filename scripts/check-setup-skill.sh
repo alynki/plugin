@@ -58,7 +58,7 @@ ok "the README carries no stale count (six)" absent_word six README.md
 
 ok "the README does not tell a person to paste a revealed agent token" absent 'you revealed' README.md
 ok "the standard plugin's token field does not offer a revealed agent token" absent 'revealed' "$STD"
-ok "the standard plugin's hooks do not offer a revealed agent token" absent 'you revealed' alynki-plugin/hooks/hooks.json
+ok "the standard plugin's hooks do not offer a revealed agent token" absent 'you revealed' alynki-plugin/hooks/session-start.json alynki-plugin/hooks/subagent-start.json
 
 ok "the README names the standard plugin's version" named_in_readme alynki "$(jq -r .version "$STD")"
 
@@ -183,6 +183,42 @@ ok "the plugin's own README opens with what Alynki is" opens_with_what_alynki_is
 ok "the repository README opens in the same register" opens_with_what_alynki_is README.md
 ok "the install commands match https://alynki.com/docs/ (two commands, no reload step)" readme_install_matches_docs
 ok "the README says each step output and check evaluation is saved with a reasoning" grep -qF 'Each step output and check evaluation is saved with a reasoning' README.md
+
+# Directory validation (alynki/alynki#3148): hook commands are ${CLAUDE_PLUGIN_ROOT} paths, the hook text is kept as it was
+# (founder option B, 2026-11-15: any change to it is the founder's decision, so its hashes are pinned), the folder has its own LICENSE.
+HOOKS=alynki-plugin/hooks/hooks.json
+SESSION_START_SHA256=65b193c0dc2e0ac96813b0c461d9c3a3a22e0fa6f7b932eb7f87ce6fee24e8b1
+SUBAGENT_START_SHA256=26cb4548b3e510fc6c4aec47bb86254fd6430fcef9071a16a41123b4ebdd13a7
+sha_of() { { sha256sum "$1" 2>/dev/null || shasum -a 256 "$1"; } | cut -d' ' -f1; }
+# shellcheck disable=SC2016 # ${CLAUDE_PLUGIN_ROOT} is literal text in the hook command
+hook_commands_use_plugin_root() {
+  [ "$(jq -r '[.hooks[][].hooks[].command] | length' "$HOOKS")" -eq 2 ] &&
+    [ "$(jq -r '[.hooks[][].hooks[].command | startswith("cat \"${CLAUDE_PLUGIN_ROOT}\"/hooks/")] | all' "$HOOKS")" = "true" ] &&
+    [ "$(jq -r '[.hooks[][].hooks[].command | contains("<<")] | any' "$HOOKS")" = "false" ]
+}
+hook_files_exist_and_are_json() {
+  local f
+  for f in alynki-plugin/hooks/session-start.json alynki-plugin/hooks/subagent-start.json; do
+    jq -e '.hookSpecificOutput.hookEventName' "$f" >/dev/null || return 1
+  done
+}
+hook_text_is_kept() { [ "$(sha_of alynki-plugin/hooks/session-start.json)" = "$SESSION_START_SHA256" ] && [ "$(sha_of alynki-plugin/hooks/subagent-start.json)" = "$SUBAGENT_START_SHA256" ]; }
+hook_commands_print_the_files() {
+  local d out
+  d=$PWD/alynki-plugin
+  out=$(CLAUDE_PLUGIN_ROOT=$d sh -c "$(jq -r '.hooks.SessionStart[0].hooks[0].command' "$HOOKS")") && [ "$out" = "$(cat "$d/hooks/session-start.json")" ] &&
+    out=$(CLAUDE_PLUGIN_ROOT=$d sh -c "$(jq -r '.hooks.SubagentStart[0].hooks[0].command' "$HOOKS")") && [ "$out" = "$(cat "$d/hooks/subagent-start.json")" ]
+}
+plugin_license_matches_root() { cmp -s LICENSE alynki-plugin/LICENSE; }
+no_private_repository_link() { ! grep -rhoE --exclude-dir=.git 'github\.com/alynki/[A-Za-z0-9._-]+' README.md alynki-plugin | grep -vx 'github.com/alynki/plugin'; }
+ok "the hook commands are CLAUDE_PLUGIN_ROOT paths, not inline heredocs" hook_commands_use_plugin_root
+ok "each hook's file exists and is hook JSON" hook_files_exist_and_are_json
+ok "the hook commands print their files (a real run with CLAUDE_PLUGIN_ROOT set)" hook_commands_print_the_files
+ok "the hook text is kept as it was (sha256 pinned; a change is the founder's decision)" hook_text_is_kept
+ok "the plugin folder has its own LICENSE, identical to the repository's" plugin_license_matches_root
+ok "no link points into a private repository" no_private_repository_link
+ok "the plugin README says what the plugin runs, sends and fetches" grep -qF '## What it runs, sends and fetches' alynki-plugin/README.md
+ok "the plugin README holds the token finding for the reviewer" grep -qF 'One setting is held for a reviewer' alynki-plugin/README.md
 
 echo "$n assertions, $failed failed"
 [ "$failed" -eq 0 ] || exit 1
