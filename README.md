@@ -286,6 +286,14 @@ including the one setting held in `settings.json` (*What it runs, sends and fetc
 ## Release notes
 
 - `alynki` 0.28.0: the marketplace offers `alynki` alone, because sealed tenants are discontinued for now. a4bafebd10828a84b9424352121ad0464d3cbe23 is the commit that last carried the sealed variant (`alynki-sealed`, in `alynki-sealed-plugin/`), and git history keeps it.
+  Also in 0.28.0: the listing words come from the approved listing kit, with `icon` (a copy of
+  https://alynki.com/favicon-512.png inside the plugin), `privacyPolicyUrl`, `homepage` and
+  `repository` in `plugin.json`; the plugin folder has its own README and LICENSE; the hook commands
+  are `${CLAUDE_PLUGIN_ROOT}` paths and the hook text is unchanged; the README says what the plugin
+  runs, sends and fetches and that each step output and check evaluation is saved with a reasoning.
+  No tool and no prompt added (the counts are those of the diagram above: 44 tools and 44 prompts
+  for a person, 8 tools for an agent), and the `/alynki:setup` list of seven asking tools is
+  unchanged.
 - `alynki` 0.27.0: the inherited-check tools added for interactive credentials,
   `create_inherited_check`, `list_inherited_checks`, `load_inherited_check`,
   `move_inherited_check` and `delete_inherited_check` (the counts are those of the diagram above;
