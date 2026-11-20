@@ -1,0 +1,32 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/copilot/plugin/v2.4/schema.json",
+  "schema_version": "v2.4",
+  "name_for_human": "Alynki",
+  "namespace": "alynki",
+  "description_for_human": "Your organisation's governed context, workflows and checks.",
+  "description_for_model": "Alynki serves the organisation's governed context (a tree of nodes) and the workflows, runs, steps and checks that define how work is done. Call load_context first, paged to completion, before any other tool. Use these tools for any question about the organisation's context or work.",
+  "contact_email": "info@alynki.com",
+  "legal_info_url": "https://alynki.com/terms/",
+  "privacy_policy_url": "https://alynki.com/privacy/",
+  "functions": [],
+  "runtimes": [
+    {
+      "type": "RemoteMCPServer",
+      "auth": {
+        "type": "OAuthPluginVault",
+        "reference_id": "${ALYNKI_COPILOT_REGISTRATION_ID}"
+      },
+      "spec": {
+        "url": "https://mcp.alynki.com/mcp"
+      },
+      "run_for_functions": ["*"]
+    }
+  ],
+  "capabilities": {
+    "conversation_starters": [
+      {
+        "text": "List my nodes in Alynki"
+      }
+    ]
+  }
+}

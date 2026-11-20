@@ -1,0 +1,33 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.19/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.19",
+  "version": "1.0.0",
+  "id": "ab686a7d-d752-4810-98ab-9c5db5024be5",
+  "developer": {
+    "name": "Alynki",
+    "websiteUrl": "https://alynki.com",
+    "privacyUrl": "https://alynki.com/privacy/",
+    "termsOfUseUrl": "https://alynki.com/terms/"
+  },
+  "name": {
+    "short": "Alynki",
+    "full": "Alynki"
+  },
+  "description": {
+    "short": "Your organisation's governed context and workflows, in Copilot.",
+    "full": "Alynki is the business context layer: a governed tree of obligations, product and team context, and the definition of each kind of work, with workflows of steps and checks that validate the work against what it inherited. This agent reads and works that tree on behalf of the signed-in person, with exactly the access that person has in Alynki."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#0B1118",
+  "copilotAgents": {
+    "declarativeAgents": [
+      {
+        "id": "alynki",
+        "file": "declarativeAgent.json"
+      }
+    ]
+  }
+}

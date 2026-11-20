@@ -16,6 +16,8 @@ One plugin ships from this marketplace: **`alynki`**.
   `alynki-marketplace`, listing the plugin.
 - `alynki-plugin/` (`alynki`): an HTTP MCP connection, the `bin/headers.sh` header helper, the
   session hooks and the [`setup` skill](alynki-plugin/skills/setup/SKILL.md).
+- `copilot/`: the sources and the build of the Microsoft 365 Copilot agent package, a zip (see
+  [Microsoft 365 Copilot](#microsoft-365-copilot)). It is not part of `alynki-plugin/`.
 
 ## Credential paths
 
@@ -283,7 +285,7 @@ To grant it by hand, add one `permissions.allow` entry per line of `tools.txt` t
 | Client | Setup |
 |---|---|
 | Claude Code | `/alynki:setup`, above. |
-| Antigravity CLI | `sh alynki-plugin/bin/setup-antigravity.sh` from a clone. It merges `mcp(alynki/<tool>)` rules for the 44 tools into `permissions.allow` of `~/.gemini/antigravity-cli/settings.json`, keeps every other entry, and a second run changes nothing. Needs `jq`. Antigravity documents `mcp(server/*)` and `mcp(*)` wildcards too; the script writes the explicit list. |
+| Antigravity CLI | `sh alynki-plugin/bin/setup-antigravity.sh` from a clone. It merges `mcp(alynki/<tool>)` rules for the 44 interactive tools into `permissions.allow` of `~/.gemini/antigravity-cli/settings.json`, keeps every other entry, and a second run changes nothing. Needs `jq`. Antigravity documents `mcp(server/*)` and `mcp(*)` wildcards too; the script writes the explicit list. |
 | Codex CLI, VS Code, GitHub Copilot CLI | No local permission file is written here; approve per your client's own prompt. |
 | ChatGPT, Microsoft 365 Copilot, grok.com | Approval is set in the product, not on this machine; see the documentation page at https://alynki.com/docs/. |
 
@@ -294,7 +296,7 @@ including the one setting held in `settings.json` (*What it runs, sends and fetc
 
 ## Release notes
 
-- Unreleased: `/alynki:setup` allows all 44 tools (the seven access-changing tools no longer ask) from
+- Unreleased: `/alynki:setup` allows all 44 interactive tools (the seven access-changing tools no longer ask) from
   one list, `alynki-plugin/tools.txt`, and `alynki-plugin/bin/setup-antigravity.sh` does the same for
   Antigravity CLI. The version is not bumped here.
 - `alynki` 0.28.0: the marketplace offers `alynki` alone, because sealed tenants are discontinued for now. a4bafebd10828a84b9424352121ad0464d3cbe23 is the commit that last carried the sealed variant (`alynki-sealed`, in `alynki-sealed-plugin/`), and git history keeps it.
@@ -329,6 +331,37 @@ including the one setting held in `settings.json` (*What it runs, sends and fetc
   `update_principal_agent`, so seven tools ask; re-run it on a machine set up earlier to add the
   rule. The pinned-token text offers only an operator-issued token, since the app no longer reveals
   agent tokens. The tool counts followed the server's tool list of that release (39 at the time).
+
+## Microsoft 365 Copilot
+
+Microsoft 365 Copilot has no box for a remote MCP server's URL. A server reaches it only inside an
+app package: a declarative agent whose API plugin names the server and an OAuth client
+registration. `copilot/` holds that package's sources: the Teams app manifest (1.19), the
+declarative agent (v1.6) and the API plugin (v2.4), whose runtime is a `RemoteMCPServer` at
+`https://mcp.alynki.com/mcp` with `OAuthPluginVault` auth, plus `color.png` (192x192) and
+`outline.png` (32x32). The plugin lists no tool: with `functions` empty and `run_for_functions`
+`["*"]`, Copilot discovers the server's tools at run time. The agent's instructions say to call
+`load_context` first, paged to completion, as the other clients do.
+
+The registration ID is not in the repository. Register the OAuth client in the Teams Developer
+Portal (Tools, OAuth client registration), then build the zip with its ID:
+
+```sh
+copilot/build.sh <registration-id> [out.zip]   # default: copilot/alynki-copilot.zip
+```
+
+The script refuses an empty or placeholder ID, substitutes the ID for
+`${ALYNKI_COPILOT_REGISTRATION_ID}` as the plugin's `reference_id`, checks the JSON and the icon
+sizes, and writes the five files at the root of the zip. It needs `jq` and `zip`.
+
+Until a store listing exists, a customer's Microsoft 365 admin installs the zip:
+
+1. Open the Microsoft 365 admin centre, then **Agents**.
+2. Choose **Add agent** (upload a custom app) and select the zip.
+3. Choose who gets it (specific users, groups or everyone) and publish.
+
+The agent then appears in each chosen person's Copilot. The first time it calls a tool, Copilot
+asks the person to sign in to Alynki.
 
 ## Status
 
