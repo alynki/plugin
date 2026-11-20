@@ -211,6 +211,7 @@ ok "the 0.28.0 release note says the listing, the hook command form and the coun
 ok "the plugin's version is named in the README's release notes" grep -qF "\`alynki\` $(jq -r .version "$STD"):" README.md
 
 # One plugin for every client (alynki/alynki#3349): one wording file, one script, one address, one version.
+ok "the standard plugin's version is at least 0.29.0, the release of one plugin for every client" version_at_least "$STD" 0.29.0
 CODEX=alynki-plugin/.codex-plugin/plugin.json
 AGY=alynki-plugin/.antigravity-plugin/plugin.json
 MCP_URL=https://mcp.alynki.com/mcp
