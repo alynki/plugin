@@ -234,9 +234,9 @@ MCP_URL=https://mcp.alynki.com/mcp
 # One url per MCP file; Claude's .mcp.json is the server itself, the others sit under mcpServers.alynki.
 mcp_urls() {
   jq -r '.alynki.url' alynki-plugin/.mcp.json
-  jq -r '.mcpServers.alynki.url' alynki-plugin/mcp.json alynki-plugin/mcp_config.json
+  jq -r '.mcpServers.alynki.url' alynki-plugin/mcp.json alynki-plugin/mcp_config.json alynki-plugin/copilot-mcp.json
 }
-mcp_urls_all_match() { [ "$(mcp_urls | wc -l | tr -d ' ')" -eq 3 ] && [ "$(mcp_urls | sort -u | wc -l | tr -d ' ')" -eq 1 ] && [ "$(mcp_urls | head -n1)" = "$MCP_URL" ]; }
+mcp_urls_all_match() { [ "$(mcp_urls | wc -l | tr -d ' ')" -eq 4 ] && [ "$(mcp_urls | sort -u | wc -l | tr -d ' ')" -eq 1 ] && [ "$(mcp_urls | head -n1)" = "$MCP_URL" ]; }
 # The wording is found by two of its sentences; only load-first.md may hold them (this script is not scanned).
 wording_only_in_load_first() {
   [ "$(grep -rlF --exclude-dir=.git --exclude-dir=scripts -e 'MANDATORY FIRST ACTION' -e 'PAGE TO COMPLETION' . | sort -u)" = "./alynki-plugin/hooks/load-first.md" ]
@@ -263,7 +263,7 @@ readmes_cover_the_clients() {
     grep -qF 'Codex CLI' "$f" && grep -qF 'Antigravity CLI' "$f" && grep -qF 'load_context' "$f" && grep -qF 'installed by hand' "$f" || return 1
   done
 }
-ok "every MCP file (.mcp.json, mcp.json, mcp_config.json) names the same url, https://mcp.alynki.com/mcp" mcp_urls_all_match
+ok "every MCP file (.mcp.json, mcp.json, mcp_config.json, copilot-mcp.json) names the same url, https://mcp.alynki.com/mcp" mcp_urls_all_match
 ok "the hook wording exists in one place, hooks/load-first.md" wording_only_in_load_first
 ok "the Codex and Antigravity manifests carry the Claude manifest's version" versions_all_match
 ok "the Codex and Antigravity manifests are named alynki" names_all_match
@@ -274,6 +274,54 @@ ok "session-start.sh copilot prints the wording as top-level additionalContext" 
 ok "session-start.sh refuses an unknown shape" unknown_shape_refused
 ok "no Grok hook ships (Grok Build session hooks cannot inject)" no_grok_hook
 ok "both READMEs cover Codex CLI, Antigravity CLI, load_context and hand installs" readmes_cover_the_clients
+
+readmes_cover_copilot() {
+  local f
+  for f in README.md "$PLUGIN_README"; do
+    grep -qF 'chat.plugins.enabled' "$f" && grep -qF 'Chat: Install Plugin from Source' "$f" && grep -qF 'copilot plugin marketplace add alynki/plugin' "$f" &&
+      grep -qF 'copilot plugin install alynki@alynki-marketplace' "$f" && grep -qF 'preview' "$f" && grep -qF 'ChatPluginsEnabled' "$f" || return 1
+  done
+}
+# VS Code and GitHub Copilot CLI (alynki/alynki#3353, D11): a Copilot-format root plugin.json names its own hooks and MCP files,
+# because Antigravity's hooks file has a fixed name (its manifest has no hooks field) and sits at the root as hooks.json.
+COP=alynki-plugin/plugin.json
+COPHOOKS=alynki-plugin/hooks/copilot-hooks.json
+copilot_manifest_matches() { [ "$(jq -r .name "$COP")" = alynki ] && [ "$(jq -r .version "$COP")" = "$(jq -r .version "$STD")" ]; }
+copilot_manifest_names_its_files() {
+  [ "$(jq -r .hooks "$COP")" = "./hooks/copilot-hooks.json" ] && [ -s "$COPHOOKS" ] &&
+    [ "$(jq -r .mcpServers "$COP")" = "./copilot-mcp.json" ] && [ -s alynki-plugin/copilot-mcp.json ]
+}
+copilot_hooks_are_flat_version_1() {
+  jq -e '.version == 1 and (.hooks | keys | sort) == ["sessionStart","subagentStart"] and ([.hooks[][] | has("hooks") | not] | all) and ([.hooks[][] | .type == "command" and (.timeoutSec | type == "number")] | all)' "$COPHOOKS" >/dev/null
+}
+copilot_hooks_use_the_shared_script() {
+  [ "$(jq -r '.hooks.sessionStart[0].command' "$COPHOOKS")" = "sh ./hooks/session-start.sh copilot session" ] &&
+    [ "$(jq -r '.hooks.subagentStart[0].command' "$COPHOOKS")" = "sh ./hooks/session-start.sh copilot subagent" ]
+}
+copilot_hook_commands_print_the_output() {
+  local out
+  out=$(cd alynki-plugin && sh -c "$(jq -r '.hooks.sessionStart[0].command' hooks/copilot-hooks.json)" </dev/null) && [ "$out" = "$(sh alynki-plugin/hooks/session-start.sh copilot session </dev/null)" ] &&
+    out=$(cd alynki-plugin && sh -c "$(jq -r '.hooks.subagentStart[0].command' hooks/copilot-hooks.json)" </dev/null) && [ "$out" = "$(sh alynki-plugin/hooks/session-start.sh copilot subagent </dev/null)" ]
+}
+copilot_output_is_exactly_additional_context() {
+  sh alynki-plugin/hooks/session-start.sh copilot session </dev/null | jq -e 'keys == ["additionalContext"]' >/dev/null &&
+    sh alynki-plugin/hooks/session-start.sh copilot subagent </dev/null | jq -e 'keys == ["additionalContext"]' >/dev/null
+}
+copilot_mcp_is_wrapped_http() { jq -e '.mcpServers.alynki | .type == "http" and has("url")' alynki-plugin/copilot-mcp.json >/dev/null; }
+# Antigravity: the root hooks.json is the file its docs name; named groups, no Copilot keys, and its manifest has no hooks field.
+antigravity_hooks_are_named_groups() {
+  jq -e 'has("version") == false and has("hooks") == false and (.["alynki-load-first"].SessionStart | length) == 1' alynki-plugin/hooks.json >/dev/null &&
+    jq -e 'has("hooks") | not' "$AGY" >/dev/null
+}
+ok "the Copilot root plugin.json carries the Claude manifest's name and version" copilot_manifest_matches
+ok "the Copilot root plugin.json names hooks/copilot-hooks.json and copilot-mcp.json, both present" copilot_manifest_names_its_files
+ok "the Copilot hooks file is version 1, flat, with sessionStart and subagentStart command entries and a timeout" copilot_hooks_are_flat_version_1
+ok "the Copilot hooks run the shared script with the copilot shape (sh ./hooks/session-start.sh copilot session|subagent)" copilot_hooks_use_the_shared_script
+ok "the Copilot hook commands print the script's output (run from the plugin root)" copilot_hook_commands_print_the_output
+ok "session-start.sh copilot prints exactly one top-level key, additionalContext, for both events" copilot_output_is_exactly_additional_context
+ok "the Copilot MCP config is wrapped in mcpServers with type http and a url" copilot_mcp_is_wrapped_http
+ok "the Antigravity root hooks.json is named groups with no Copilot keys, and its manifest has no hooks field" antigravity_hooks_are_named_groups
+ok "both READMEs cover VS Code, GitHub Copilot CLI, chat.plugins.enabled and the preview status" readmes_cover_copilot
 
 echo "$n assertions, $failed failed"
 [ "$failed" -eq 0 ] || exit 1

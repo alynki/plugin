@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "command": "sh ./hooks/session-start.sh copilot session",
+        "timeoutSec": 30
+      }
+    ],
+    "subagentStart": [
+      {
+        "type": "command",
+        "command": "sh ./hooks/session-start.sh copilot subagent",
+        "timeoutSec": 30
+      }
+    ]
+  }
+}

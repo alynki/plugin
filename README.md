@@ -80,9 +80,22 @@ agy plugin install https://github.com/alynki/plugin
 
 Antigravity reads `alynki-plugin/.antigravity-plugin/plugin.json`, `mcp_config.json` and `hooks.json`. If your version expects the plugin at the repository root, install from a local clone's `alynki-plugin/` folder instead: `agy plugin install <path>/alynki-plugin`. Sign in when Antigravity first connects. Run `agy plugin validate ./alynki-plugin` to check the folder; its warnings about `.mcp.json`, `mcp.json` and `hooks/hooks.json` are expected, since those files are for the other clients.
 
+### VS Code (GitHub Copilot)
+
+Turn on the `chat.plugins.enabled` setting, then run "Chat: Install Plugin from Source" from the Command Palette and enter `alynki/plugin`.
+
+### GitHub Copilot CLI
+
+```
+copilot plugin marketplace add alynki/plugin
+copilot plugin install alynki@alynki-marketplace
+```
+
+Copilot reads the root `plugin.json` (Copilot format), which names `hooks/copilot-hooks.json` (the `sessionStart` and `subagentStart` hooks) and `copilot-mcp.json` (the same address). Antigravity keeps the fixed root `hooks.json`, so the Copilot hooks sit in their own file. Sign in when the client first connects. Agent hooks in VS Code and Copilot CLI are in preview, and the instruction only runs where your organisation allows plugins and hooks: the VS Code policies `ChatPluginsEnabled`, `ChatAllowManagedHooksOnly` and `ChatStrictMarketplaces` can block either. Without the hook, ask your agent to call `load_context` first.
+
 ### Every client
 
-A session starts with `load_context`: the hook (Claude Code, Codex, Antigravity) tells the session, and in Claude Code every subagent, to call Alynki's `load_context` first, and the server's own instructions say the same everywhere else. The hooks are one script, `alynki-plugin/hooks/session-start.sh`, printing one wording file, `alynki-plugin/hooks/load-first.md`, in each client's output shape. Grok Build has no hook that can inject text, so it ships none: add a line to `~/.grok/AGENTS.md` telling Grok to call Alynki's `load_context` first.
+A session starts with `load_context`: the hook (Claude Code, Codex, Antigravity, VS Code and Copilot CLI) tells the session, and in Claude Code every subagent, to call Alynki's `load_context` first, and the server's own instructions say the same everywhere else. The hooks are one script, `alynki-plugin/hooks/session-start.sh`, printing one wording file, `alynki-plugin/hooks/load-first.md`, in each client's output shape. Grok Build has no hook that can inject text, so it ships none: add a line to `~/.grok/AGENTS.md` telling Grok to call Alynki's `load_context` first.
 
 **To sign in with your own identity**, install and use it; run `/mcp` to sign in when prompted.
 
