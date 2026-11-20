@@ -1,0 +1,10 @@
+{
+  "alynki-load-first": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "sh ./hooks/session-start.sh antigravity session"
+      }
+    ]
+  }
+}

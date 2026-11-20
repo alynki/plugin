@@ -6,7 +6,7 @@ Alynki requires an Alynki account. Request access at alynki.com/contact. Setup a
 
 To start in Claude Code, run `/plugin marketplace add alynki/plugin` and then `/plugin install alynki@alynki-marketplace`. The connection is bundled, so no other step is needed, and you sign in with your own identity the first time you use Alynki (*Install*).
 
-This is the Claude Code plugin for Alynki. It loads your organisation's context into every session: the policy and product context for the scope your credential holds and, where that scope sits in a workflow, the steps, checks and runs that define how the work is done. Alynki delivers to a principal only what that principal is granted; it does not constrain what an agent obtains from other sources.
+This is the plugin for Alynki in Claude Code, Codex CLI and Antigravity CLI. It loads your organisation's context into every session: the policy and product context for the scope your credential holds and, where that scope sits in a workflow, the steps, checks and runs that define how the work is done. Alynki delivers to a principal only what that principal is granted; it does not constrain what an agent obtains from other sources.
 
 One plugin ships from this marketplace: **`alynki`**.
 
@@ -16,6 +16,8 @@ One plugin ships from this marketplace: **`alynki`**.
   `alynki-marketplace`, listing the plugin.
 - `alynki-plugin/` (`alynki`): an HTTP MCP connection, the `bin/headers.sh` header helper, the
   session hooks and the [`setup` skill](alynki-plugin/skills/setup/SKILL.md).
+- `copilot/`: the sources and the build of the Microsoft 365 Copilot agent package, a zip (see
+  [Microsoft 365 Copilot](#microsoft-365-copilot)). It is not part of `alynki-plugin/`.
 
 ## Credential paths
 
@@ -67,6 +69,49 @@ the one its controller issues it, and never sees a sign-in prompt.
 ```
 
 That is the whole install: **the MCP connection is bundled**, with no `claude mcp add` step.
+
+### Codex CLI
+
+Codex reads the same plugin folder (`alynki-plugin/`, with its `.codex-plugin/plugin.json`, `mcp.json` and the Claude `hooks/hooks.json`). Install it by hand from a clone of this repository, in your Codex plugin settings, then sign in when Codex first connects to `https://mcp.alynki.com/mcp`. Codex runs a plugin's hooks only for a plugin you installed by hand, and only after you review and trust them (it skips them otherwise), so the session-start instruction does not run from the public plugin directory. Without the hook, ask your agent to call `load_context` first, or rely on the server's own instructions.
+
+### Antigravity CLI
+
+```
+agy plugin install https://github.com/alynki/plugin
+```
+
+Antigravity reads `alynki-plugin/.antigravity-plugin/plugin.json`, `mcp_config.json` and `hooks.json`. If your version expects the plugin at the repository root, install from a local clone's `alynki-plugin/` folder instead: `agy plugin install <path>/alynki-plugin`. Sign in when Antigravity first connects. Run `agy plugin validate ./alynki-plugin` to check the folder; its warnings about `.mcp.json`, `mcp.json` and `hooks/hooks.json` are expected, since those files are for the other clients.
+
+### VS Code (GitHub Copilot)
+
+Turn on the `chat.plugins.enabled` setting, then run "Chat: Install Plugin from Source" from the Command Palette and enter `alynki/plugin`.
+
+### GitHub Copilot CLI
+
+```
+copilot plugin marketplace add alynki/plugin
+copilot plugin install alynki@alynki-marketplace
+```
+
+Copilot reads the root `plugin.json` (Copilot format), which names `hooks/copilot-hooks.json` (the `sessionStart` and `subagentStart` hooks) and `copilot-mcp.json` (the same address). Antigravity keeps the fixed root `hooks.json`, so the Copilot hooks sit in their own file. Sign in when the client first connects. Agent hooks in VS Code and Copilot CLI are in preview, and the instruction only runs where your organisation allows plugins and hooks: the VS Code policies `ChatPluginsEnabled`, `ChatAllowManagedHooksOnly` and `ChatStrictMarketplaces` can block either. Without the hook, ask your agent to call `load_context` first.
+
+### Grok (Grok Build and grok.com)
+
+Grok reaches Alynki as a remote MCP connector at `https://mcp.alynki.com/mcp`; sign in when it first connects. Grok Build's session-start hooks only observe, so the plugin ships no hook for it. Add this one line to the global `~/.grok/AGENTS.md` (not a working-directory file, and not a file Codex also reads):
+
+```text
+Before anything else in every session and subagent, call Alynki's load_context, and page it to completion.
+```
+
+grok.com reads the connector's server instructions, which already name `load_context` first.
+
+### ChatGPT
+
+Add Alynki as a connector (Settings, Apps and connectors, a custom connector at `https://mcp.alynki.com/mcp`) and sign in. ChatGPT has no session-start hook; the connector's server instructions tell a new chat to call `load_context` first.
+
+### Every client
+
+A session starts with `load_context`: the hook (Claude Code, Codex, Antigravity, VS Code and Copilot CLI) tells the session, and in Claude Code every subagent, to call Alynki's `load_context` first, and the server's own instructions say the same everywhere else. The hooks are one script, `alynki-plugin/hooks/session-start.sh`, printing one wording file, `alynki-plugin/hooks/load-first.md`, in each client's output shape. Grok Build has no hook that can inject text, so it ships none: the line in `~/.grok/AGENTS.md` above does it.
 
 **To sign in with your own identity**, install and use it; run `/mcp` to sign in when prompted.
 
@@ -140,10 +185,12 @@ Key: diamond, a decision made by the server; rectangle, the surface a session is
   or `node` and follow `next_cursor`. The tool descriptions and prompts the server serves carry the exact rules for what each tool
   does, and for how confirm tokens, the run lease, the context token, run holds and non-composing
   reads work.
-- `SessionStart` and `SubagentStart` hooks that instruct every session, and every subagent, to call
-  `load_context` first (`SessionStart` emits both `initialUserMessage` and `additionalContext`;
-  `SubagentStart` emits `additionalContext`). The text names only `load_context`, which every
-  credential class holds.
+- `SessionStart` and `SubagentStart` hooks (Claude Code and Codex; Antigravity gets `SessionStart`) that
+  instruct every session, and every subagent, to call `load_context` first. Each runs
+  `hooks/session-start.sh`, which prints the one wording file `hooks/load-first.md` in the client's
+  shape (Claude Code and Codex: `SessionStart` emits both `initialUserMessage` and
+  `additionalContext`, `SubagentStart` emits `additionalContext`; Antigravity: an injected
+  `systemMessage`). The text names only `load_context`, which every credential class holds.
 
 ## Working a run
 
@@ -213,70 +260,48 @@ Run once, in any session:
 /alynki:setup
 ```
 
-It shows the edit, then adds to your own
-`~/.claude/settings.json`, machine-wide:
+It shows the edit, then adds to your own `~/.claude/settings.json`, machine-wide, one exact-name rule
+per Alynki tool in `permissions.allow`: all 44, the seven that change who has access or manage the
+agents (`grant_principal`, `revoke_principal`, `invite_principal`, `revoke_principal_invite`,
+`create_principal_agent`, `update_principal_agent`, `revoke_principal_agent`) included. The
+`plugin_alynki_alynki` segment is exact, so the rules can only match Alynki's own server. On a machine
+set up by an earlier version it also removes the seven ask rules that version wrote.
 
-- the wildcard `mcp__plugin_alynki_alynki__*` to `permissions.allow`, covering every Alynki tool
-  including ones added later (the `plugin_alynki_alynki` segment is exact, so it can only match
-  Alynki's own server);
-- seven exact-name rules to `permissions.ask`, so the tools that change who has access or manage the
-  agents that act in an organisation still prompt before every call: `grant_principal`,
-  `revoke_principal`, `invite_principal`, `revoke_principal_invite`, `create_principal_agent`,
-  `update_principal_agent` and `revoke_principal_agent`.
+The list is one file, [`alynki-plugin/tools.txt`](alynki-plugin/tools.txt), one tool name per line.
+Every setup reads it and none holds a copy. A tool the server adds later is covered once the list
+gains it and the setup is run again.
 
-```mermaid
----
-title: How a call to an Alynki tool is decided after setup
----
-graph TB
-  req["A call to an Alynki tool"]
-  deny{"A deny rule matches?"}
-  ask{"An ask rule matches? Exactly the seven gated tools"}
-  allow{"The allow wildcard matches?"}
-  refused["Refused"]
-  prompt["Prompts before the call: no permission mode auto-approves it"]
-  run["Runs without a prompt"]
-  mode["Prompts as the permission mode decides"]
-
-  req -->|"Claude Code evaluates deny first"| deny
-  deny -->|"yes"| refused
-  deny -->|"no: then ask"| ask
-  ask -->|"yes"| prompt
-  ask -->|"no: then allow"| allow
-  allow -->|"yes"| run
-  allow -->|"no"| mode
-```
-
-Key: diamond, a rule check in Claude Code's fixed order; rectangle, the outcome.
-
-Re-running the command adds any rule that is missing, on a machine set up before that rule existed
-too, and changes nothing else. ⚠️ The gate lives in this client: a non-interactive `-p` run without
-`--permission-prompt-tool` cannot answer the prompt, `dontAsk` denies these calls, and another MCP
-client may not prompt at all.
+⚠️ With no prompt, text an agent reads (a node body, a run record) can steer an access-changing call
+such as `grant_principal` without a person seeing it first. The server's entitlement checks still
+bound what that call can do.
 
 ⚠️ **This command still prompts once, for its own write.** `~/.claude` is a protected path, so no
 allow rule suppresses that prompt. It removes every *subsequent* Alynki prompt, not its own.
 
-To grant it by hand, add to `~/.claude/settings.json`, keeping existing entries:
+To grant it by hand, add one `permissions.allow` entry per line of `tools.txt` to
+`~/.claude/settings.json`, keeping existing entries:
 
 ```json
 {
   "permissions": {
     "allow": [
-      "mcp__plugin_alynki_alynki__*"
-    ],
-    "ask": [
-      "mcp__plugin_alynki_alynki__grant_principal",
-      "mcp__plugin_alynki_alynki__revoke_principal",
-      "mcp__plugin_alynki_alynki__invite_principal",
-      "mcp__plugin_alynki_alynki__revoke_principal_invite",
-      "mcp__plugin_alynki_alynki__create_principal_agent",
-      "mcp__plugin_alynki_alynki__update_principal_agent",
-      "mcp__plugin_alynki_alynki__revoke_principal_agent"
+      "mcp__plugin_alynki_alynki__load_context",
+      "mcp__plugin_alynki_alynki__save_context"
     ]
   }
 }
 ```
+
+(Two entries shown; the real list has 44.)
+
+### Setup per client
+
+| Client | Setup |
+|---|---|
+| Claude Code | `/alynki:setup`, above. |
+| Antigravity CLI | `sh alynki-plugin/bin/setup-antigravity.sh` from a clone. It merges `mcp(alynki/<tool>)` rules for the 44 interactive tools into `permissions.allow` of `~/.gemini/antigravity-cli/settings.json`, keeps every other entry, and a second run changes nothing. Needs `jq`. Antigravity documents `mcp(server/*)` and `mcp(*)` wildcards too; the script writes the explicit list. |
+| Codex CLI, VS Code, GitHub Copilot CLI | No local permission file is written here; approve per your client's own prompt. |
+| ChatGPT, Microsoft 365 Copilot, grok.com | Approval is set in the product, not on this machine; see the documentation page at https://alynki.com/docs/. |
 
 ## What the plugin runs, sends and fetches
 
@@ -285,6 +310,13 @@ including the one setting held in `settings.json` (*What it runs, sends and fetc
 
 ## Release notes
 
+- `alynki` 0.29.0: one plugin for every client. One wording file (`alynki-plugin/hooks/load-first.md`) and one
+  script (`alynki-plugin/hooks/session-start.sh`) start each session and subagent with `load_context` in Claude Code,
+  Codex CLI, Antigravity CLI, VS Code and GitHub Copilot CLI, each from its own manifest and MCP file at the one
+  address `https://mcp.alynki.com/mcp`; Grok and ChatGPT get their install steps above. `/alynki:setup` allows all
+  44 interactive tools (the seven access-changing tools no longer ask) from one list, `alynki-plugin/tools.txt`, and
+  `alynki-plugin/bin/setup-antigravity.sh` does the same for Antigravity CLI. `copilot/` holds the Microsoft 365
+  Copilot agent package and its `build.sh`. No tool and no prompt added: 44 tools and 44 prompts.
 - `alynki` 0.28.0: the marketplace offers `alynki` alone, because sealed tenants are discontinued for now. a4bafebd10828a84b9424352121ad0464d3cbe23 is the commit that last carried the sealed variant (`alynki-sealed`, in `alynki-sealed-plugin/`), and git history keeps it.
   Also in 0.28.0: the listing words come from the approved listing kit, with `icon` (a copy of
   https://alynki.com/favicon-512.png inside the plugin), `privacyPolicyUrl`, `homepage` and
@@ -317,6 +349,37 @@ including the one setting held in `settings.json` (*What it runs, sends and fetc
   `update_principal_agent`, so seven tools ask; re-run it on a machine set up earlier to add the
   rule. The pinned-token text offers only an operator-issued token, since the app no longer reveals
   agent tokens. The tool counts followed the server's tool list of that release (39 at the time).
+
+## Microsoft 365 Copilot
+
+Microsoft 365 Copilot has no box for a remote MCP server's URL. A server reaches it only inside an
+app package: a declarative agent whose API plugin names the server and an OAuth client
+registration. `copilot/` holds that package's sources: the Teams app manifest (1.19), the
+declarative agent (v1.6) and the API plugin (v2.4), whose runtime is a `RemoteMCPServer` at
+`https://mcp.alynki.com/mcp` with `OAuthPluginVault` auth, plus `color.png` (192x192) and
+`outline.png` (32x32). The plugin lists no tool: with `functions` empty and `run_for_functions`
+`["*"]`, Copilot discovers the server's tools at run time. The agent's instructions say to call
+`load_context` first, paged to completion, as the other clients do.
+
+The registration ID is not in the repository. Register the OAuth client in the Teams Developer
+Portal (Tools, OAuth client registration), then build the zip with its ID:
+
+```sh
+copilot/build.sh <registration-id> [out.zip]   # default: copilot/alynki-copilot.zip
+```
+
+The script refuses an empty or placeholder ID, writes the ID into the plugin's `reference_id`
+(a placeholder in `copilot/alynki-plugin.json`, not an environment variable), checks the JSON and the icon
+sizes, and writes the five files at the root of the zip. It needs `jq` and `zip`.
+
+Until a store listing exists, a customer's Microsoft 365 admin installs the zip:
+
+1. Open the Microsoft 365 admin centre, then **Agents**.
+2. Choose **Add agent** (upload a custom app) and select the zip.
+3. Choose who gets it (specific users, groups or everyone) and publish.
+
+The agent then appears in each chosen person's Copilot. The first time it calls a tool, Copilot
+asks the person to sign in to Alynki.
 
 ## Status
 

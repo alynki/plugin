@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "alynki": {
+      "type": "streamable-http",
+      "url": "https://mcp.alynki.com/mcp"
+    }
+  }
+}
