@@ -6,7 +6,7 @@ Alynki requires an Alynki account. Request access at alynki.com/contact. Setup a
 
 ## Start
 
-In Claude Code, run these two commands. The connection is bundled, so no other step is needed.
+In Claude Code, run these two commands. The connection is bundled, so no other step is needed. Codex CLI and Antigravity CLI are covered below.
 
 ```
 /plugin marketplace add alynki/plugin
@@ -17,15 +17,31 @@ You need no token. The first time you use Alynki, Claude Code opens a browser wi
 
 If your operator issued you a pinned token, put it in the plugin's **Alynki API token** field (`/plugin`). It wins over signing in.
 
+## Codex CLI
+
+Codex reads this folder as it is: `.codex-plugin/plugin.json`, `mcp.json` (the same address, with a transport `type`) and the Claude `hooks/hooks.json`, which Codex accepts as it stands. Install it by hand from a clone of the repository in your Codex plugin settings, and sign in when Codex first connects. Codex runs a plugin's hooks only for a plugin installed by hand, and only after you review and trust them, so the load-first instruction does not run from the public plugin directory. A session then starts with `load_context`; without the hook, ask your agent to call `load_context` first.
+
+## Antigravity CLI
+
+```
+agy plugin install https://github.com/alynki/plugin
+```
+
+Antigravity reads `.antigravity-plugin/plugin.json`, `mcp_config.json` and `hooks.json` from this folder. If your version needs the plugin at the root of what you install, run `agy plugin install <path>/alynki-plugin` from a clone. Sign in when Antigravity first connects. The `SessionStart` hook injects the same load-first text, so a session starts with `load_context`. `agy plugin validate` warns about `.mcp.json`, `mcp.json` and `hooks/hooks.json`; those files are for the other clients.
+
+## Grok Build
+
+Grok Build has no hook that can inject text into a session, so this plugin ships none. Add one line to `~/.grok/AGENTS.md`: call Alynki's `load_context` first.
+
 ## What you can ask
 
 What your business already knows, how you decide, who may do what and what good looks like, is written once and inherited by every person and every agent at the point of work. With Alynki connected, you can ask for the standards and decisions that apply where you work, define workflows and the checks each step must pass, and start a run and work it step by step. A person decides the checks that need judgement, in the Alynki app. You only ever see and change the parts of your business you have access to.
 
 ## What it runs, sends and fetches
 
-Claude Code runs three things from this plugin, and nothing else:
+Claude Code runs three things from this plugin, and nothing else (Codex and Antigravity run only the hook script, the same way):
 
-- **Two hooks**, `SessionStart` and `SubagentStart`. Each runs `cat "${CLAUDE_PLUGIN_ROOT}"/hooks/<file>.json` and prints a fixed text that tells the session, and every subagent it starts, to call `load_context` first. The text applies even when the user's message asks the model not to use tools, and it says the model may tell the user it loaded the context. The hooks make no network call and read nothing else.
+- **Two hooks**, `SessionStart` and `SubagentStart`. Each runs `sh "${CLAUDE_PLUGIN_ROOT}"/hooks/session-start.sh claude <session|subagent>`, which prints the fixed text in `hooks/load-first.md` and tells the session, and every subagent it starts, to call `load_context` first. The text applies even when the user's message asks the model not to use tools, and it says the model may tell the user it loaded the context. The hooks make no network call and read nothing else.
 - **A header helper**, `bin/headers.sh`, which Claude Code runs when it connects, reconnects or meets a 401 or 403 from Alynki. It needs `jq`, reads only the `alynki` entry under `pluginConfigs` in `$CLAUDE_CONFIG_DIR/settings.json` (`~/.claude/settings.json` when that is unset), and prints a JSON object of headers: `Authorization: Bearer <token>` when a pinned token is set, and `X-Alynki-Model: <model>` when the optional model setting is a plain model id. It writes nothing, makes no network call and never prints the model.
 - **A setup skill**, `/alynki:setup`, which runs only when you invoke it. It shows you an edit to `~/.claude/settings.json` that adds a standing permission for Alynki's tools, asks before every tool that changes who has access, and applies the edit once you agree.
 

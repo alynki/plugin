@@ -58,7 +58,7 @@ ok "the README carries no stale count (six)" absent_word six README.md
 
 ok "the README does not tell a person to paste a revealed agent token" absent 'you revealed' README.md
 ok "the standard plugin's token field does not offer a revealed agent token" absent 'revealed' "$STD"
-ok "the standard plugin's hooks do not offer a revealed agent token" absent 'you revealed' alynki-plugin/hooks/session-start.json alynki-plugin/hooks/subagent-start.json
+ok "the standard plugin's hooks do not offer a revealed agent token" absent 'you revealed' alynki-plugin/hooks/load-first.md
 
 ok "the README names the standard plugin's version" named_in_readme alynki "$(jq -r .version "$STD")"
 
@@ -187,34 +187,36 @@ ok "the README says each step output and check evaluation is saved with a reason
 # Directory validation (alynki/alynki#3148): hook commands are ${CLAUDE_PLUGIN_ROOT} paths, the hook text is kept as it was
 # (founder option B, 2026-11-15: any change to it is the founder's decision, so its hashes are pinned), the folder has its own LICENSE.
 HOOKS=alynki-plugin/hooks/hooks.json
+# The hook text now lives in hooks/load-first.md; the pins are the hashes of what `session-start.sh claude` prints, unchanged since #3148.
 SESSION_START_SHA256=65b193c0dc2e0ac96813b0c461d9c3a3a22e0fa6f7b932eb7f87ce6fee24e8b1
 SUBAGENT_START_SHA256=26cb4548b3e510fc6c4aec47bb86254fd6430fcef9071a16a41123b4ebdd13a7
 sha_of() { { sha256sum "$1" 2>/dev/null || shasum -a 256 "$1"; } | cut -d' ' -f1; }
 # shellcheck disable=SC2016 # ${CLAUDE_PLUGIN_ROOT} is literal text in the hook command
 hook_commands_use_plugin_root() {
   [ "$(jq -r '[.hooks[][].hooks[].command] | length' "$HOOKS")" -eq 2 ] &&
-    [ "$(jq -r '[.hooks[][].hooks[].command | startswith("cat \"${CLAUDE_PLUGIN_ROOT}\"/hooks/")] | all' "$HOOKS")" = "true" ] &&
+    [ "$(jq -r '[.hooks[][].hooks[].command | startswith("sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/session-start.sh claude ")] | all' "$HOOKS")" = "true" ] &&
     [ "$(jq -r '[.hooks[][].hooks[].command | contains("<<")] | any' "$HOOKS")" = "false" ]
 }
-hook_files_exist_and_are_json() {
-  local f
-  for f in alynki-plugin/hooks/session-start.json alynki-plugin/hooks/subagent-start.json; do
-    jq -e '.hookSpecificOutput.hookEventName' "$f" >/dev/null || return 1
-  done
+hook_script_and_wording_exist() { [ -x alynki-plugin/hooks/session-start.sh ] && [ -s alynki-plugin/hooks/load-first.md ]; }
+claude_output() { sh alynki-plugin/hooks/session-start.sh claude "$1" </dev/null; }
+claude_output_is_hook_json() {
+  claude_output session | jq -e '.hookSpecificOutput.hookEventName == "SessionStart"' >/dev/null &&
+    claude_output subagent | jq -e '.hookSpecificOutput.hookEventName == "SubagentStart"' >/dev/null
 }
-hook_text_is_kept() { [ "$(sha_of alynki-plugin/hooks/session-start.json)" = "$SESSION_START_SHA256" ] && [ "$(sha_of alynki-plugin/hooks/subagent-start.json)" = "$SUBAGENT_START_SHA256" ]; }
-hook_commands_print_the_files() {
+hook_text_is_kept() { [ "$(claude_output session | shasum -a 256 | cut -d' ' -f1)" = "$SESSION_START_SHA256" ] && [ "$(claude_output subagent | shasum -a 256 | cut -d' ' -f1)" = "$SUBAGENT_START_SHA256" ]; }
+hook_commands_print_the_output() {
   local d out
   d=$PWD/alynki-plugin
-  out=$(CLAUDE_PLUGIN_ROOT=$d sh -c "$(jq -r '.hooks.SessionStart[0].hooks[0].command' "$HOOKS")") && [ "$out" = "$(cat "$d/hooks/session-start.json")" ] &&
-    out=$(CLAUDE_PLUGIN_ROOT=$d sh -c "$(jq -r '.hooks.SubagentStart[0].hooks[0].command' "$HOOKS")") && [ "$out" = "$(cat "$d/hooks/subagent-start.json")" ]
+  out=$(CLAUDE_PLUGIN_ROOT=$d sh -c "$(jq -r '.hooks.SessionStart[0].hooks[0].command' "$HOOKS")" </dev/null) && [ "$out" = "$(claude_output session)" ] &&
+    out=$(CLAUDE_PLUGIN_ROOT=$d sh -c "$(jq -r '.hooks.SubagentStart[0].hooks[0].command' "$HOOKS")" </dev/null) && [ "$out" = "$(claude_output subagent)" ]
 }
 plugin_license_matches_root() { cmp -s LICENSE alynki-plugin/LICENSE; }
 no_private_repository_link() { ! grep -rhoE --exclude-dir=.git 'github\.com/alynki/[A-Za-z0-9._-]+' README.md alynki-plugin | grep -vx 'github.com/alynki/plugin'; }
 ok "the hook commands are CLAUDE_PLUGIN_ROOT paths, not inline heredocs" hook_commands_use_plugin_root
-ok "each hook's file exists and is hook JSON" hook_files_exist_and_are_json
-ok "the hook commands print their files (a real run with CLAUDE_PLUGIN_ROOT set)" hook_commands_print_the_files
-ok "the hook text is kept as it was (sha256 pinned; a change is the founder's decision)" hook_text_is_kept
+ok "the wording file and the executable hook script exist" hook_script_and_wording_exist
+ok "session-start.sh claude prints hook JSON for both events" claude_output_is_hook_json
+ok "the hook commands print the script's output (a real run with CLAUDE_PLUGIN_ROOT set)" hook_commands_print_the_output
+ok "the hook text is kept as it was (sha256 of the script's Claude output, pinned; a change is the founder's decision)" hook_text_is_kept
 ok "the plugin folder has its own LICENSE, identical to the repository's" plugin_license_matches_root
 ok "no link points into a private repository" no_private_repository_link
 ok "the plugin README says what the plugin runs, sends and fetches" grep -qF '## What it runs, sends and fetches' alynki-plugin/README.md
@@ -224,6 +226,54 @@ ok "the plugin README holds the token finding for the reviewer" grep -qF 'One se
 ok "the standard plugin's version is at least 0.28.0, the release of the listing and the directory validation" version_at_least "$STD" 0.28.0
 ok "the 0.28.0 release note says the listing, the hook command form and the counts unchanged" grep -qF 'No tool and no prompt added (the counts are those of the diagram above: 44 tools and 44 prompts' README.md
 ok "the plugin's version is named in the README's release notes" grep -qF "\`alynki\` $(jq -r .version "$STD"):" README.md
+
+# One plugin for every client (alynki/alynki#3349): one wording file, one script, one address, one version.
+CODEX=alynki-plugin/.codex-plugin/plugin.json
+AGY=alynki-plugin/.antigravity-plugin/plugin.json
+MCP_URL=https://mcp.alynki.com/mcp
+# One url per MCP file; Claude's .mcp.json is the server itself, the others sit under mcpServers.alynki.
+mcp_urls() {
+  jq -r '.alynki.url' alynki-plugin/.mcp.json
+  jq -r '.mcpServers.alynki.url' alynki-plugin/mcp.json alynki-plugin/mcp_config.json
+}
+mcp_urls_all_match() { [ "$(mcp_urls | wc -l | tr -d ' ')" -eq 3 ] && [ "$(mcp_urls | sort -u | wc -l | tr -d ' ')" -eq 1 ] && [ "$(mcp_urls | head -n1)" = "$MCP_URL" ]; }
+# The wording is found by two of its sentences; only load-first.md may hold them (this script is not scanned).
+wording_only_in_load_first() {
+  [ "$(grep -rlF --exclude-dir=.git --exclude-dir=scripts -e 'MANDATORY FIRST ACTION' -e 'PAGE TO COMPLETION' . | sort -u)" = "./alynki-plugin/hooks/load-first.md" ]
+}
+versions_all_match() { [ "$(jq -r .version "$CODEX")" = "$(jq -r .version "$STD")" ] && [ "$(jq -r .version "$AGY")" = "$(jq -r .version "$STD")" ]; }
+names_all_match() { [ "$(jq -r .name "$CODEX")" = alynki ] && [ "$(jq -r .name "$AGY")" = alynki ]; }
+codex_mcp_declares_transport() { jq -e '.mcpServers.alynki | has("type") and has("url")' alynki-plugin/mcp.json >/dev/null; }
+antigravity_output_injects_the_wording() {
+  sh alynki-plugin/hooks/session-start.sh antigravity session </dev/null | jq -e --rawfile w alynki-plugin/hooks/load-first.md '.injectSteps[0].systemMessage.systemMessage + "\n" == $w' >/dev/null
+}
+antigravity_hook_runs_the_script() {
+  local out
+  out=$(cd alynki-plugin && sh -c "$(jq -r '.["alynki-load-first"].SessionStart[0].command' hooks.json)" </dev/null) && [ "$out" = "$(sh alynki-plugin/hooks/session-start.sh antigravity session </dev/null)" ]
+}
+copilot_output_has_the_wording() {
+  sh alynki-plugin/hooks/session-start.sh copilot session </dev/null | jq -e --rawfile w alynki-plugin/hooks/load-first.md '.additionalContext + "\n" == $w' >/dev/null
+}
+unknown_shape_refused() { ! sh alynki-plugin/hooks/session-start.sh nope session </dev/null >/dev/null 2>&1; }
+no_grok_hook() { [ ! -e alynki-plugin/.grok-plugin ]; }
+# shellcheck disable=SC2016 # the backticks are literal Markdown
+readmes_cover_the_clients() {
+  local f
+  for f in README.md "$PLUGIN_README"; do
+    grep -qF 'Codex CLI' "$f" && grep -qF 'Antigravity CLI' "$f" && grep -qF 'load_context' "$f" && grep -qF 'installed by hand' "$f" || return 1
+  done
+}
+ok "every MCP file (.mcp.json, mcp.json, mcp_config.json) names the same url, https://mcp.alynki.com/mcp" mcp_urls_all_match
+ok "the hook wording exists in one place, hooks/load-first.md" wording_only_in_load_first
+ok "the Codex and Antigravity manifests carry the Claude manifest's version" versions_all_match
+ok "the Codex and Antigravity manifests are named alynki" names_all_match
+ok "the Codex mcp.json declares a transport type and a url" codex_mcp_declares_transport
+ok "session-start.sh antigravity prints the wording as an injected systemMessage" antigravity_output_injects_the_wording
+ok "the Antigravity hooks.json command prints the script's output (run from the plugin root)" antigravity_hook_runs_the_script
+ok "session-start.sh copilot prints the wording as top-level additionalContext" copilot_output_has_the_wording
+ok "session-start.sh refuses an unknown shape" unknown_shape_refused
+ok "no Grok hook ships (Grok Build session hooks cannot inject)" no_grok_hook
+ok "both READMEs cover Codex CLI, Antigravity CLI, load_context and hand installs" readmes_cover_the_clients
 
 echo "$n assertions, $failed failed"
 [ "$failed" -eq 0 ] || exit 1
