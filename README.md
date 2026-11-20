@@ -6,17 +6,16 @@ Alynki requires an Alynki account. Request access at alynki.com/contact. Setup a
 
 To start in Claude Code, run `/plugin marketplace add alynki/plugin` and then `/plugin install alynki@alynki-marketplace`. The connection is bundled, so no other step is needed, and you sign in with your own identity the first time you use Alynki (*Install*).
 
-This is the Claude Code plugin for Alynki, the marketplace's one plugin: **`alynki`**. It loads your organisation's context into every session: the policy and product context for the scope your credential holds and, where that scope sits in a workflow, the steps, checks and runs that define how the work is done. Alynki delivers to a principal only what that principal is granted; it does not constrain what an agent obtains from other sources.
+This is the Claude Code plugin for Alynki. It loads your organisation's context into every session: the policy and product context for the scope your credential holds and, where that scope sits in a workflow, the steps, checks and runs that define how the work is done. Alynki delivers to a principal only what that principal is granted; it does not constrain what an agent obtains from other sources.
+
+One plugin ships from this marketplace: **`alynki`**.
 
 ## Repository layout
 
 - [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json): the marketplace
   `alynki-marketplace`, listing the plugin.
-- `alynki-plugin/` (`alynki`, with its own [README](alynki-plugin/README.md) for the directory
-  listing): an HTTP MCP connection, the `bin/headers.sh` header helper, the session hooks and the
-  [`setup` skill](alynki-plugin/skills/setup/SKILL.md).
-- [`scripts/check-setup-skill.sh`](scripts/check-setup-skill.sh): the CI assertions on the skill,
-  this README, the header script, the hooks and the listing.
+- `alynki-plugin/` (`alynki`): an HTTP MCP connection, the `bin/headers.sh` header helper, the
+  session hooks and the [`setup` skill](alynki-plugin/skills/setup/SKILL.md).
 
 ## Credential paths
 
@@ -54,11 +53,11 @@ graph TB
 Key: rectangle, a process or message; diamond, a decision; the boxed group is the plugin.
 
 A static `headers.Authorization` key in `.mcp.json` would disable Claude Code's OAuth fallback
-unconditionally, even when its value is empty, so a `headersHelper` script decides at connection
-time. It reads the token with `jq`; without `jq` on `PATH` it emits no header and the session signs
-in instead. It also sends the session's model as a second header (see *The model header*). An agent
-working a run unattended has one credential, the one its controller issues it, and never sees a
-sign-in prompt.
+unconditionally, even when its value is empty, so the plugin decides at connection time
+with a `headersHelper` script. The script reads the token with `jq`; without `jq` on `PATH` it emits
+no header and the session signs in instead. The same script sends the session's model as a second
+header (see *The model header*). An agent working a run unattended has one credential,
+the one its controller issues it, and never sees a sign-in prompt.
 
 ## Install
 
@@ -76,10 +75,10 @@ field (`/plugin`, or `--config token=…` on install). The token is stored in `s
 `headers.sh` reads it. Unattended automation never signs in, since sign-in needs a human in a
 browser.
 
-⚠️ **The Alynki app shows no agent token** (an agent has none to reveal): an agent works only through
-the credential a controller is issued, so there is nothing to copy from the app into this field. If
-a retired token is still in the field, the server answers 401 `token not recognised`. Clear the
-field and sign in with `/mcp`.
+⚠️ **The Alynki app shows no agent token** (no "Show token"; an agent has none to reveal): an agent
+works only through the credential a controller is issued, so there is nothing to copy from the app
+into this field. A token revealed before V2.5.2 was retired; if one is still in the field, the
+server answers 401 `token not recognised`. Clear the field and sign in with `/mcp`.
 
 ### The model header
 
@@ -87,20 +86,20 @@ An optional setting, **`model`**, sits beside the token in the plugin's configur
 set (for example `claude-sonnet-5-5`), `bin/headers.sh` sends it with every call as the second
 header, **`X-Alynki-Model`**, next to `Authorization`; when it is absent or is not a plain model id
 (letters, digits, `.`, `_`, `:`, `-`, at most 100 characters, no leading `-`), **no model header is
-sent**. The model is never printed: the script's only output is the header JSON. A controller that
-launches a session on a chosen model writes the setting into that session's private settings; a
-person's own session leaves it blank. The header is a consistency control, not a boundary: the
-server checks it only when it is sent.
+sent**. The model is never printed: the script's only output is the header JSON Claude Code
+consumes. A controller that launches a session on a chosen model writes the setting into that
+session's private settings; a person's own session leaves it blank and sends none. The header is a
+consistency control, not a boundary: a call without it is not checked by the server.
 
 ## Environment variables
 
 Every variable the plugin reads, and where:
 
-- `CLAUDE_CONFIG_DIR`: where Claude Code keeps `settings.json`. `bin/headers.sh` reads the pinned
-  token and the model setting from `$CLAUDE_CONFIG_DIR/settings.json`, and from
-  `~/.claude/settings.json` when it is unset.
-- `CLAUDE_PLUGIN_ROOT`: set by Claude Code to the installed plugin's directory; `.mcp.json` and the
-  hook commands use it to locate `bin/headers.sh` and the hook files.
+- `CLAUDE_CONFIG_DIR`: where Claude Code keeps `settings.json`. The plugin's
+  `bin/headers.sh` reads the pinned token and the model setting from
+  `$CLAUDE_CONFIG_DIR/settings.json`, and from `~/.claude/settings.json` when it is unset.
+- `CLAUDE_PLUGIN_ROOT`: set by Claude Code to the installed plugin's directory; the plugin's
+  `.mcp.json` uses it to locate `bin/headers.sh`.
 
 ## What it installs
 
@@ -127,8 +126,8 @@ Key: diamond, a decision made by the server; rectangle, the surface a session is
   and the `step` or `check`; `save_run` and `save_check` a `workflow`, the run's `label` and the
   `step` or `check`. `step` accompanies a `check` only when that check's label repeats under two
   steps. Outside a run, `load_step` and `load_check` read the template with `node`. No authoring,
-  deletion, move, people or agent tool is served to a pinned credential: calling one is refused as
-  a tool that does not exist.
+  deletion, move, people or agent tool is served to a pinned credential: calling one is the refusal
+  for a tool that does not exist.
 - **Interactive** (human) credentials are offered all **forty-four** tools (the eight plus every
   other tool, among them `create_inherited_check`, `list_inherited_checks`, `load_inherited_check`,
   `move_inherited_check` and `delete_inherited_check`). Every tool but `start_run` has a typed slash
@@ -136,13 +135,13 @@ Key: diamond, a decision made by the server; rectangle, the surface a session is
   `start_run`: forty-four prompts. Prompts are never offered to a pinned credential.
 - **Large context is paged** in 25 KiB pages: both credential classes read it with the optional
   `cursor` of `load_context`, `load_step` and `load_check`. Only an interactive session saves a large
-  body in staged chunks (`mode` `stage`, then `commit`); a pinned `save_context` takes the body
-  whole. The eight paged list tools answer ten rows a page: narrow with `query`, `state` or `node`
-  and follow `next_cursor`. The tool descriptions and prompts the server serves carry the exact
-  rules for each tool, and for confirm tokens, the run lease, the context token, run holds and
-  non-composing reads.
+  body in staged chunks (`mode` `stage`, then `commit`); a pinned `save_context` has no staged mode
+  and takes the body whole. The eight list tools answer ten rows a page: narrow with `query`, `state`
+  or `node` and follow `next_cursor`. The tool descriptions and prompts the server serves carry the exact rules for what each tool
+  does, and for how confirm tokens, the run lease, the context token, run holds and non-composing
+  reads work.
 - `SessionStart` and `SubagentStart` hooks that instruct every session, and every subagent, to call
-  `load_context` first (`SessionStart` emits `initialUserMessage` and `additionalContext`;
+  `load_context` first (`SessionStart` emits both `initialUserMessage` and `additionalContext`;
   `SubagentStart` emits `additionalContext`). The text names only `load_context`, which every
   credential class holds.
 
@@ -179,38 +178,43 @@ Key: solid arrow, a request; dashed arrow, a reply; the loop ends at a stop.
 - **In an interactive session**, the `work-run` prompt takes the `workflow` and the `run`'s
   label and works the run to a stop. Unattended work runs through `alynki-controller`, a separate
   customer-side piece that embeds a copy of this plugin: it polls Alynki's controller API (never
-  MCP) for ready runs and starts one headless session per run it reserves; that session calls
-  `load_context` and `start_run` over MCP as an interactive one does.
+  MCP, a different credential and surface) for ready runs and starts one headless session per run it
+  reserves; that session calls `load_context` and `start_run` over MCP as an interactive one does.
 - **A pinned session** gets a `context_token` from `load_context`'s last page, required by every
   run, step and check tool, and a `lease_id` from `start_run`, required by every write. Every write
   returns the next action or a stop; following it verbatim is the whole loop.
 - **The trail is delivered once per lease.** `load_step` and `load_check` with a `run` return the
-  run's whole trail to the lease holder on its first load after `start_run`; every later load
-  returns the step's or check's own text and a closing line saying the trail was already delivered.
-  `start_run` again, or `load_run`, returns the records again (after a compaction, for instance). A
-  session without the lease gets the definition alone, and a save before the first load is refused
-  with the call to make.
-- **Each step output and check evaluation is saved with a reasoning.** `save_run` and `save_check`
-  take a `reasoning` with every `output`, a human check's included: one plain paragraph of 10 to 80
-  words saying why the work was done or the verdict reached, not the output restated. Nothing is
-  saved without it, and the run's record prints it beside the output or evaluation.
+  whole trail of the run to the holder of the run's lease on its first load after `start_run`; every
+  later load by the holder returns the step's or check's own text and one closing line saying the
+  trail was already delivered, which is faster and uses far fewer tokens. `start_run` again, or
+  `load_run`, returns the records again (after a compaction, for instance). A session that does not
+  hold the lease gets the definition alone, and a save before the first load is refused with the
+  call to make.
+- **Each step output and check evaluation is saved with a reasoning.** `save_run` takes a
+  `reasoning` with every `output`, and `save_check` with every `output`, a human check's included:
+  one plain paragraph of 10 to 80 words saying why the work was done or the verdict reached, not
+  the output restated. Nothing is saved without it, and the run's record prints it beside the output
+  or evaluation.
 - **A human check is decided in the app only, by a person, never over MCP**, by any credential.
   `save_check` records the evaluation and hands the run to a person; deciding it (`approved`) is
   refused and says so.
-- **A revoked agent is kept, never deleted.** Every run record it left stays, shown as revoked in
-  the Alynki app.
+- **A revoked agent is kept, never deleted.** Its credential and every run record it left stay,
+  shown as revoked in the Alynki app.
 
 ## After installing: grant standing permission
 
 A plugin cannot pre-approve its own tool calls, and has no install-time hook. Left alone, each
 session prompts for `load_context` the first time it runs, and accepting saves the grant to that
-**repository only**: a session started anywhere else prompts again. Run once, in any session:
+**repository only**; a session started anywhere else prompts again.
+
+Run once, in any session:
 
 ```
 /alynki:setup
 ```
 
-It shows the edit, then adds to your own `~/.claude/settings.json`, machine-wide:
+It shows the edit, then adds to your own
+`~/.claude/settings.json`, machine-wide:
 
 - the wildcard `mcp__plugin_alynki_alynki__*` to `permissions.allow`, covering every Alynki tool
   including ones added later (the `plugin_alynki_alynki` segment is exact, so it can only match
@@ -245,12 +249,13 @@ graph TB
 
 Key: diamond, a rule check in Claude Code's fixed order; rectangle, the outcome.
 
-Re-running the command adds any missing rule, on a machine set up earlier too, and changes nothing
-else. ⚠️ The gate lives in this client: a non-interactive `-p` run without
+Re-running the command adds any rule that is missing, on a machine set up before that rule existed
+too, and changes nothing else. ⚠️ The gate lives in this client: a non-interactive `-p` run without
 `--permission-prompt-tool` cannot answer the prompt, `dontAsk` denies these calls, and another MCP
-client may not prompt at all. ⚠️ **The command prompts once, for its own write**: `~/.claude` is a
-protected path, so no allow rule suppresses that prompt. It removes every *subsequent* Alynki
-prompt, not its own.
+client may not prompt at all.
+
+⚠️ **This command still prompts once, for its own write.** `~/.claude` is a protected path, so no
+allow rule suppresses that prompt. It removes every *subsequent* Alynki prompt, not its own.
 
 To grant it by hand, add to `~/.claude/settings.json`, keeping existing entries:
 
@@ -284,30 +289,58 @@ including the one setting held in `settings.json` (*What it runs, sends and fetc
   Also in 0.28.0: the listing words come from the approved listing kit, with `icon` (a copy of
   https://alynki.com/favicon-512.png inside the plugin), `privacyPolicyUrl`, `homepage` and
   `repository` in `plugin.json`; the plugin folder has its own README and LICENSE; the hook commands
-  are `${CLAUDE_PLUGIN_ROOT}` paths and the hook text is unchanged.
+  are `${CLAUDE_PLUGIN_ROOT}` paths and the hook text is unchanged; the README says what the plugin
+  runs, sends and fetches and that each step output and check evaluation is saved with a reasoning.
   No tool and no prompt added (the counts are those of the diagram above: 44 tools and 44 prompts
   for a person, 8 tools for an agent), and the `/alynki:setup` list of seven asking tools is
-  unchanged. Earlier releases: git history.
+  unchanged.
+- `alynki` 0.27.0: the inherited-check tools added for interactive credentials,
+  `create_inherited_check`, `list_inherited_checks`, `load_inherited_check`,
+  `move_inherited_check` and `delete_inherited_check` (the counts are those of the diagram above;
+  the agent set stays eight). `load_step`, `load_check`, `save_run` and `save_check` take labels
+  (`workflow`, `run` or `label`, `step`, `check`). The `/alynki:setup` list of seven asking tools is
+  unchanged.
+- `alynki` 0.26.0: the tools and prompts name a place `node` (it was
+  `address`; `parent`, `new_parent`, `path` and `workflow` stay as roles), and the seven list tools
+  page ten rows with `cursor` and `next_cursor`, search with `query` and, for `list_runs`, filter by
+  `state`. No tool and no prompt added (the counts are those of the diagram above), and the
+  `/alynki:setup` list of seven asking tools is unchanged.
+- `alynki` 0.25.0: a new optional **model** setting beside the token, which sends it as the second
+  header `X-Alynki-Model` and sends nothing when it is absent. The README states that the trail now
+  arrives once per lease. No tool and no prompt added (the counts are those of the diagram above).
+- `alynki` 0.24.0: no tool and no prompt added (the counts are those
+  of the diagram above); the tool descriptions of `load_run`, `list_runs`,
+  `list_pending_checks`, `start_run`, `release_run`, `create_trigger`, `create_workflow`,
+  `update_workflow` and `load_workflow` follow the server, so a run's standing can now be paused or
+  terminated.
+- `alynki` 0.23.0: `/alynki:setup` also asks before
+  `update_principal_agent`, so seven tools ask; re-run it on a machine set up earlier to add the
+  rule. The pinned-token text offers only an operator-issued token, since the app no longer reveals
+  agent tokens. The tool counts followed the server's tool list of that release (39 at the time).
 
-## Endpoint
+## Status
 
-**One shared endpoint: `https://mcp.alynki.com/mcp`.** Your tenant is resolved server-side from the
-credential, never from the URL, so **the plugin asks for no tenant** and its `.mcp.json` carries one
-literal URL. ⚠️ **RFC 9728 §3.3 requires** the `resource` identifier a client is handed to be
-identical to the URL it dialled, so one shared URL and one shared resource identifier are the same
-decision. For development against a local server, make an **uncommitted** working-copy change:
-`main` only ever carries production.
+- **One shared endpoint: `https://mcp.alynki.com/mcp`.** Your tenant is resolved server-side from
+  the credential, never from the URL, so **the plugin asks for no tenant** and its `.mcp.json`
+  carries one literal URL. ⚠️ **RFC 9728 §3.3 requires** the `resource` identifier a client
+  is handed to be identical to the URL it dialled, so one shared URL and one shared resource
+  identifier are the same decision. For development against a local server, make an **uncommitted**
+  working-copy change: `main` only ever carries production.
+- **Visibility:** this repository is **public**. A plugin marketplace must be installable without
+  git access to a private Alynki repository, and this one carries nothing that needs it (*Content
+  policy*).
 
 ## Content policy: read before adding anything
 
-**This repository is public**, so the plugin installs without git access to a private Alynki
-repository. It contains **only** the plugin and its marketplace manifest. The following are
-**explicitly excluded** and must never be added: VISION, architecture documents, feature
-specifications, patent material, the risk register, competitor analysis, anything carrying a
-confidentiality banner. CI greps every push for the banner and fails the build if one appears.
+**This repository is public.** It exists so the plugin can be installed without access to
+Alynki's private repositories, and contains **only** the plugin and its marketplace manifest.
+The following are **explicitly excluded** and must never be added: VISION, architecture documents,
+feature specifications, patent material, the risk register, competitor analysis, anything carrying
+a confidentiality banner. CI greps every push for the banner and fails the build if one appears.
 
-Nothing customer-specific may appear either: the plugin is identical for every installer, so a node
-label or tenant name here would leak one customer's structure to all others.
+Nothing customer-specific may appear in the plugin either. The plugin is identical for every
+installer; a node label or tenant name in these files would leak one customer's structure to all
+others.
 
 ## Licence
 
