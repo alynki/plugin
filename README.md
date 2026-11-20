@@ -310,9 +310,13 @@ including the one setting held in `settings.json` (*What it runs, sends and fetc
 
 ## Release notes
 
-- Unreleased: `/alynki:setup` allows all 44 interactive tools (the seven access-changing tools no longer ask) from
-  one list, `alynki-plugin/tools.txt`, and `alynki-plugin/bin/setup-antigravity.sh` does the same for
-  Antigravity CLI. The version is not bumped here.
+- `alynki` 0.29.0: one plugin for every client. One wording file (`alynki-plugin/hooks/load-first.md`) and one
+  script (`alynki-plugin/hooks/session-start.sh`) start each session and subagent with `load_context` in Claude Code,
+  Codex CLI, Antigravity CLI, VS Code and GitHub Copilot CLI, each from its own manifest and MCP file at the one
+  address `https://mcp.alynki.com/mcp`; Grok and ChatGPT get their install steps above. `/alynki:setup` allows all
+  44 interactive tools (the seven access-changing tools no longer ask) from one list, `alynki-plugin/tools.txt`, and
+  `alynki-plugin/bin/setup-antigravity.sh` does the same for Antigravity CLI. `copilot/` holds the Microsoft 365
+  Copilot agent package and its `build.sh`. No tool and no prompt added: 44 tools and 44 prompts.
 - `alynki` 0.28.0: the marketplace offers `alynki` alone, because sealed tenants are discontinued for now. a4bafebd10828a84b9424352121ad0464d3cbe23 is the commit that last carried the sealed variant (`alynki-sealed`, in `alynki-sealed-plugin/`), and git history keeps it.
   Also in 0.28.0: the listing words come from the approved listing kit, with `icon` (a copy of
   https://alynki.com/favicon-512.png inside the plugin), `privacyPolicyUrl`, `homepage` and
