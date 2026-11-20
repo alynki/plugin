@@ -244,70 +244,48 @@ Run once, in any session:
 /alynki:setup
 ```
 
-It shows the edit, then adds to your own
-`~/.claude/settings.json`, machine-wide:
+It shows the edit, then adds to your own `~/.claude/settings.json`, machine-wide, one exact-name rule
+per Alynki tool in `permissions.allow`: all 44, the seven that change who has access or manage the
+agents (`grant_principal`, `revoke_principal`, `invite_principal`, `revoke_principal_invite`,
+`create_principal_agent`, `update_principal_agent`, `revoke_principal_agent`) included. The
+`plugin_alynki_alynki` segment is exact, so the rules can only match Alynki's own server. On a machine
+set up by an earlier version it also removes the seven ask rules that version wrote.
 
-- the wildcard `mcp__plugin_alynki_alynki__*` to `permissions.allow`, covering every Alynki tool
-  including ones added later (the `plugin_alynki_alynki` segment is exact, so it can only match
-  Alynki's own server);
-- seven exact-name rules to `permissions.ask`, so the tools that change who has access or manage the
-  agents that act in an organisation still prompt before every call: `grant_principal`,
-  `revoke_principal`, `invite_principal`, `revoke_principal_invite`, `create_principal_agent`,
-  `update_principal_agent` and `revoke_principal_agent`.
+The list is one file, [`alynki-plugin/tools.txt`](alynki-plugin/tools.txt), one tool name per line.
+Every setup reads it and none holds a copy. A tool the server adds later is covered once the list
+gains it and the setup is run again.
 
-```mermaid
----
-title: How a call to an Alynki tool is decided after setup
----
-graph TB
-  req["A call to an Alynki tool"]
-  deny{"A deny rule matches?"}
-  ask{"An ask rule matches? Exactly the seven gated tools"}
-  allow{"The allow wildcard matches?"}
-  refused["Refused"]
-  prompt["Prompts before the call: no permission mode auto-approves it"]
-  run["Runs without a prompt"]
-  mode["Prompts as the permission mode decides"]
-
-  req -->|"Claude Code evaluates deny first"| deny
-  deny -->|"yes"| refused
-  deny -->|"no: then ask"| ask
-  ask -->|"yes"| prompt
-  ask -->|"no: then allow"| allow
-  allow -->|"yes"| run
-  allow -->|"no"| mode
-```
-
-Key: diamond, a rule check in Claude Code's fixed order; rectangle, the outcome.
-
-Re-running the command adds any rule that is missing, on a machine set up before that rule existed
-too, and changes nothing else. ⚠️ The gate lives in this client: a non-interactive `-p` run without
-`--permission-prompt-tool` cannot answer the prompt, `dontAsk` denies these calls, and another MCP
-client may not prompt at all.
+⚠️ With no prompt, text an agent reads (a node body, a run record) can steer an access-changing call
+such as `grant_principal` without a person seeing it first. The server's entitlement checks still
+bound what that call can do.
 
 ⚠️ **This command still prompts once, for its own write.** `~/.claude` is a protected path, so no
 allow rule suppresses that prompt. It removes every *subsequent* Alynki prompt, not its own.
 
-To grant it by hand, add to `~/.claude/settings.json`, keeping existing entries:
+To grant it by hand, add one `permissions.allow` entry per line of `tools.txt` to
+`~/.claude/settings.json`, keeping existing entries:
 
 ```json
 {
   "permissions": {
     "allow": [
-      "mcp__plugin_alynki_alynki__*"
-    ],
-    "ask": [
-      "mcp__plugin_alynki_alynki__grant_principal",
-      "mcp__plugin_alynki_alynki__revoke_principal",
-      "mcp__plugin_alynki_alynki__invite_principal",
-      "mcp__plugin_alynki_alynki__revoke_principal_invite",
-      "mcp__plugin_alynki_alynki__create_principal_agent",
-      "mcp__plugin_alynki_alynki__update_principal_agent",
-      "mcp__plugin_alynki_alynki__revoke_principal_agent"
+      "mcp__plugin_alynki_alynki__load_context",
+      "mcp__plugin_alynki_alynki__save_context"
     ]
   }
 }
 ```
+
+(Two entries shown; the real list has 44.)
+
+### Setup per client
+
+| Client | Setup |
+|---|---|
+| Claude Code | `/alynki:setup`, above. |
+| Antigravity CLI | `sh alynki-plugin/bin/setup-antigravity.sh` from a clone. It merges `mcp(alynki/<tool>)` rules for the 44 tools into `permissions.allow` of `~/.gemini/antigravity-cli/settings.json`, keeps every other entry, and a second run changes nothing. Needs `jq`. Antigravity documents `mcp(server/*)` and `mcp(*)` wildcards too; the script writes the explicit list. |
+| Codex CLI, VS Code, GitHub Copilot CLI | No local permission file is written here; approve per your client's own prompt. |
+| ChatGPT, Microsoft 365 Copilot, grok.com | Approval is set in the product, not on this machine; see the documentation page at https://alynki.com/docs/. |
 
 ## What the plugin runs, sends and fetches
 
@@ -316,6 +294,9 @@ including the one setting held in `settings.json` (*What it runs, sends and fetc
 
 ## Release notes
 
+- Unreleased: `/alynki:setup` allows all 44 tools (the seven access-changing tools no longer ask) from
+  one list, `alynki-plugin/tools.txt`, and `alynki-plugin/bin/setup-antigravity.sh` does the same for
+  Antigravity CLI. The version is not bumped here.
 - `alynki` 0.28.0: the marketplace offers `alynki` alone, because sealed tenants are discontinued for now. a4bafebd10828a84b9424352121ad0464d3cbe23 is the commit that last carried the sealed variant (`alynki-sealed`, in `alynki-sealed-plugin/`), and git history keeps it.
   Also in 0.28.0: the listing words come from the approved listing kit, with `icon` (a copy of
   https://alynki.com/favicon-512.png inside the plugin), `privacyPolicyUrl`, `homepage` and

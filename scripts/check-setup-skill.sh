@@ -12,7 +12,8 @@ cd "$(dirname "$0")/.." || exit 1
 
 SKILL=alynki-plugin/skills/setup/SKILL.md
 STD=alynki-plugin/.claude-plugin/plugin.json
-GATED="grant_principal revoke_principal invite_principal revoke_principal_invite create_principal_agent update_principal_agent revoke_principal_agent"
+LIST=alynki-plugin/tools.txt
+AGYSET=alynki-plugin/bin/setup-antigravity.sh
 
 n=0
 failed=0
@@ -28,32 +29,15 @@ ok() {
   fi
 }
 
-# Each helper takes the pattern or tool first, then the file.
-listed() { grep -qx -- "- \`$1\`" "$2"; }
 absent() { ! grep -qiE -- "$1" "$2"; }
 absent_word() { ! grep -qiw -- "$1" "$2"; }
-# shellcheck disable=SC2016 # the backticks are literal Markdown
-gate_size() { [ "$(grep -cE '^- `[a-z_]+`$' "$1")" -eq "$2" ]; }
-in_readme_json() { grep -qF "\"mcp__plugin_alynki_alynki__$1\"" README.md; }
-not_in_readme_json() { ! grep -qF "mcp__plugin_alynki_alynki__$1" README.md; }
 in_readme_all() { for t in "$@"; do grep -qF "\`$t\`" README.md || return 1; done; }
 named_in_readme() { grep -qF "\`$1\` $2" README.md; }
 
 
-for t in $GATED; do
-  ok "the skill lists $t in the human gate" listed "$t" "$SKILL"
-done
-ok "the human gate holds exactly seven tools" gate_size "$SKILL" 7
-ok "the skill adds only the missing ask rules to a machine set up earlier" grep -qF 'fewer ask rules' "$SKILL"
-ok "release_run is not in the skill" absent 'release_run' "$SKILL"
 ok "the skill states no mechanism for the rule (nothing about expiry)" absent 'expir' "$SKILL"
 ok "the skill carries no stale count (six)" absent_word six "$SKILL"
 
-for t in $GATED; do
-  ok "the README's settings example asks before $t" in_readme_json "$t"
-done
-ok "release_run is not in the README's settings example" not_in_readme_json release_run
-ok "the README says seven exact-name ask rules" grep -qF 'seven exact-name rules' README.md
 ok "the README carries no stale count (six)" absent_word six README.md
 
 ok "the README does not tell a person to paste a revealed agent token" absent 'you revealed' README.md
@@ -130,7 +114,6 @@ ok "the standard plugin's version is at least 0.27.0, the release of the five in
 ok "the README names the five inherited-check tools" in_readme_all create_inherited_check list_inherited_checks load_inherited_check move_inherited_check delete_inherited_check
 ok "the README carries no stale interactive count (thirty-nine)" absent_word thirty-nine README.md
 ok "the README counts forty-four interactive tools and prompts" grep -qF 'all **forty-four** tools' README.md
-ok "the README's settings example does not ask before the five new tools" not_in_readme_json create_inherited_check
 
 # The sealed variant is removed (alynki/alynki#3262). The words are assembled from parts so this script never names what it asserts is gone.
 S=seal
@@ -322,6 +305,51 @@ ok "session-start.sh copilot prints exactly one top-level key, additionalContext
 ok "the Copilot MCP config is wrapped in mcpServers with type http and a url" copilot_mcp_is_wrapped_http
 ok "the Antigravity root hooks.json is named groups with no Copilot keys, and its manifest has no hooks field" antigravity_hooks_are_named_groups
 ok "both READMEs cover VS Code, GitHub Copilot CLI, chat.plugins.enabled and the preview status" readmes_cover_copilot
+
+# One list for every setup (alynki/alynki#3343, D9, J8): all 44 tools allowed, the list defined once.
+list_has_44_unique() {
+  [ "$(grep -c . "$LIST")" -eq 44 ] && [ "$(sort -u "$LIST" | grep -c .)" -eq 44 ] && ! grep -qvE '^[a-z]+(_[a-z]+)+$' "$LIST"
+}
+# A sample of names must appear in no other plugin file (the READMEs describe the tools; the hook wording names load_context).
+SAMPLE="grant_principal list_runs create_workflow delete_workflow save_check move_node revoke_principal_agent"
+no_second_copy() {
+  local t
+  for t in $SAMPLE; do
+    grep -qx "$t" "$LIST" || return 1
+    if grep -rlw --exclude-dir=.git --exclude=tools.txt --exclude=README.md --exclude=load-first.md -- "$t" alynki-plugin .claude-plugin | grep -q .; then return 1; fi
+  done
+}
+# Run the Antigravity script under a temporary HOME holding other settings: it merges, a second run is byte-identical.
+agy_idempotent() {
+  local h f a ok=1
+  h=$(mktemp -d) || return 1
+  f=$h/.gemini/antigravity-cli/settings.json
+  mkdir -p "$(dirname "$f")"
+  printf '{"theme":"dark","permissions":{"deny":["command(sudo)"],"allow":["command(git)"]}}' >"$f"
+  HOME=$h sh "$AGYSET" >/dev/null && cp "$f" "$h/first" && HOME=$h sh "$AGYSET" >/dev/null && cmp -s "$h/first" "$f" &&
+    [ "$(jq -r '.theme' "$f")" = dark ] && [ "$(jq -c '.permissions.deny' "$f")" = '["command(sudo)"]' ] &&
+    [ "$(jq -r '.permissions.allow[0]' "$f")" = 'command(git)' ] && [ "$(jq -r '[.permissions.allow[] | select(startswith("mcp(alynki/"))] | length' "$f")" -eq 44 ] &&
+    [ "$(jq -r '.permissions.allow | length' "$f")" -eq 45 ] || ok=0
+  rm -rf "$h"
+  [ "$ok" -eq 1 ]
+}
+agy_refuses_bad_json() {
+  local h ok=1
+  h=$(mktemp -d) || return 1
+  mkdir -p "$h/.gemini/antigravity-cli"
+  printf 'not json' >"$h/.gemini/antigravity-cli/settings.json"
+  ! HOME=$h sh "$AGYSET" >/dev/null 2>&1 && [ "$(cat "$h/.gemini/antigravity-cli/settings.json")" = 'not json' ] || ok=0
+  rm -rf "$h"
+  [ "$ok" -eq 1 ]
+}
+ok "the tool list has exactly 44 unique names, one per line" list_has_44_unique
+skill_reads_list_no_wildcard() { grep -qF 'tools.txt' "$SKILL" && grep -qF 'never a wildcard' "$SKILL" && ! grep -qE 'Add .*mcp__plugin_alynki_alynki__\*' "$SKILL"; }
+ok "the Claude setup skill reads the shared list (tools.txt) and its add step writes exact names, never a wildcard" skill_reads_list_no_wildcard
+ok "the Antigravity script reads the shared list (tools.txt)" grep -qF 'tools.txt' "$AGYSET"
+ok "no tool name outside the list file appears in the plugin's skill, scripts or manifests (no second copy)" no_second_copy
+ok "the Antigravity script merges and is idempotent under a temporary HOME (two runs, cmp)" agy_idempotent
+ok "the Antigravity script leaves an unparseable settings file untouched" agy_refuses_bad_json
+ok "both READMEs describe the setup per client and the shared list" bash -c 'grep -qF tools.txt README.md && grep -qF setup-antigravity.sh README.md && grep -qF setup-antigravity.sh alynki-plugin/README.md'
 
 echo "$n assertions, $failed failed"
 [ "$failed" -eq 0 ] || exit 1
