@@ -350,8 +350,8 @@ Portal (Tools, OAuth client registration), then build the zip with its ID:
 copilot/build.sh <registration-id> [out.zip]   # default: copilot/alynki-copilot.zip
 ```
 
-The script refuses an empty or placeholder ID, substitutes the ID for
-`${ALYNKI_COPILOT_REGISTRATION_ID}` as the plugin's `reference_id`, checks the JSON and the icon
+The script refuses an empty or placeholder ID, writes the ID into the plugin's `reference_id`
+(a placeholder in `copilot/alynki-plugin.json`, not an environment variable), checks the JSON and the icon
 sizes, and writes the five files at the root of the zip. It needs `jq` and `zip`.
 
 Until a store listing exists, a customer's Microsoft 365 admin installs the zip:
