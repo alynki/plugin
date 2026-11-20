@@ -6,7 +6,7 @@ Alynki requires an Alynki account. Request access at alynki.com/contact. Setup a
 
 To start in Claude Code, run `/plugin marketplace add alynki/plugin` and then `/plugin install alynki@alynki-marketplace`. The connection is bundled, so no other step is needed, and you sign in with your own identity the first time you use Alynki (*Install*).
 
-This is the Claude Code plugin for Alynki. It loads your organisation's context into every session: the policy and product context for the scope your credential holds and, where that scope sits in a workflow, the steps, checks and runs that define how the work is done. Alynki delivers to a principal only what that principal is granted; it does not constrain what an agent obtains from other sources.
+This is the plugin for Alynki in Claude Code, Codex CLI and Antigravity CLI. It loads your organisation's context into every session: the policy and product context for the scope your credential holds and, where that scope sits in a workflow, the steps, checks and runs that define how the work is done. Alynki delivers to a principal only what that principal is granted; it does not constrain what an agent obtains from other sources.
 
 One plugin ships from this marketplace: **`alynki`**.
 
@@ -67,6 +67,22 @@ the one its controller issues it, and never sees a sign-in prompt.
 ```
 
 That is the whole install: **the MCP connection is bundled**, with no `claude mcp add` step.
+
+### Codex CLI
+
+Codex reads the same plugin folder (`alynki-plugin/`, with its `.codex-plugin/plugin.json`, `mcp.json` and the Claude `hooks/hooks.json`). Install it by hand from a clone of this repository, in your Codex plugin settings, then sign in when Codex first connects to `https://mcp.alynki.com/mcp`. Codex runs a plugin's hooks only for a plugin you installed by hand, and only after you review and trust them (it skips them otherwise), so the session-start instruction does not run from the public plugin directory. Without the hook, ask your agent to call `load_context` first, or rely on the server's own instructions.
+
+### Antigravity CLI
+
+```
+agy plugin install https://github.com/alynki/plugin
+```
+
+Antigravity reads `alynki-plugin/.antigravity-plugin/plugin.json`, `mcp_config.json` and `hooks.json`. If your version expects the plugin at the repository root, install from a local clone's `alynki-plugin/` folder instead: `agy plugin install <path>/alynki-plugin`. Sign in when Antigravity first connects. Run `agy plugin validate ./alynki-plugin` to check the folder; its warnings about `.mcp.json`, `mcp.json` and `hooks/hooks.json` are expected, since those files are for the other clients.
+
+### Every client
+
+A session starts with `load_context`: the hook (Claude Code, Codex, Antigravity) tells the session, and in Claude Code every subagent, to call Alynki's `load_context` first, and the server's own instructions say the same everywhere else. The hooks are one script, `alynki-plugin/hooks/session-start.sh`, printing one wording file, `alynki-plugin/hooks/load-first.md`, in each client's output shape. Grok Build has no hook that can inject text, so it ships none: add a line to `~/.grok/AGENTS.md` telling Grok to call Alynki's `load_context` first.
 
 **To sign in with your own identity**, install and use it; run `/mcp` to sign in when prompted.
 
@@ -140,10 +156,12 @@ Key: diamond, a decision made by the server; rectangle, the surface a session is
   or `node` and follow `next_cursor`. The tool descriptions and prompts the server serves carry the exact rules for what each tool
   does, and for how confirm tokens, the run lease, the context token, run holds and non-composing
   reads work.
-- `SessionStart` and `SubagentStart` hooks that instruct every session, and every subagent, to call
-  `load_context` first (`SessionStart` emits both `initialUserMessage` and `additionalContext`;
-  `SubagentStart` emits `additionalContext`). The text names only `load_context`, which every
-  credential class holds.
+- `SessionStart` and `SubagentStart` hooks (Claude Code and Codex; Antigravity gets `SessionStart`) that
+  instruct every session, and every subagent, to call `load_context` first. Each runs
+  `hooks/session-start.sh`, which prints the one wording file `hooks/load-first.md` in the client's
+  shape (Claude Code and Codex: `SessionStart` emits both `initialUserMessage` and
+  `additionalContext`, `SubagentStart` emits `additionalContext`; Antigravity: an injected
+  `systemMessage`). The text names only `load_context`, which every credential class holds.
 
 ## Working a run
 
