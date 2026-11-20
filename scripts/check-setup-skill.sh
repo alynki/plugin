@@ -351,6 +351,76 @@ ok "the Antigravity script merges and is idempotent under a temporary HOME (two 
 ok "the Antigravity script leaves an unparseable settings file untouched" agy_refuses_bad_json
 ok "both READMEs describe the setup per client and the shared list" bash -c 'grep -qF tools.txt README.md && grep -qF setup-antigravity.sh README.md && grep -qF setup-antigravity.sh alynki-plugin/README.md'
 
+# The Microsoft 365 Copilot agent package (alynki/alynki#3357, D8, J12): Teams manifest 1.19, declarative agent v1.6, plugin v2.4,
+# sources under copilot/ (not in alynki-plugin/, which is the Claude, Codex and Antigravity plugin), built into a zip by copilot/build.sh.
+CP=copilot
+CP_PLUGIN=$CP/alynki-plugin.json
+CP_PLACEHOLDER='${ALYNKI_COPILOT_REGISTRATION_ID}'
+png_dims() { printf '%sx%s' "$(od -An -tu1 -j16 -N4 "$1" | awk 'NF {print $1*16777216+$2*65536+$3*256+$4}')" "$(od -An -tu1 -j20 -N4 "$1" | awk 'NF {print $1*16777216+$2*65536+$3*256+$4}')"; }
+copilot_json_parses() { jq -e . "$CP/manifest.json" "$CP/declarativeAgent.json" "$CP_PLUGIN" >/dev/null; }
+copilot_schema_versions() {
+  [ "$(jq -r .manifestVersion "$CP/manifest.json")" = 1.19 ] && [ "$(jq -r .version "$CP/declarativeAgent.json")" = v1.6 ] && [ "$(jq -r .schema_version "$CP_PLUGIN")" = v2.4 ] &&
+    [ "$(jq -r '.copilotAgents.declarativeAgents[0].file' "$CP/manifest.json")" = declarativeAgent.json ] &&
+    [ "$(jq -r '.actions[0].file' "$CP/declarativeAgent.json")" = alynki-plugin.json ] &&
+    [ "$(jq -r '.id | test("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")' "$CP/manifest.json")" = true ]
+}
+copilot_runtime_url() {
+  [ "$(jq -r '.runtimes | length' "$CP_PLUGIN")" -eq 1 ] && [ "$(jq -r '.runtimes[0].type' "$CP_PLUGIN")" = RemoteMCPServer ] &&
+    [ "$(jq -r '.runtimes[0].spec.url' "$CP_PLUGIN")" = "$MCP_URL" ] && [ "$(mcp_urls | head -n1)" = "$MCP_URL" ]
+}
+copilot_auth_is_the_vault() {
+  [ "$(jq -r '.runtimes[0].auth.type' "$CP_PLUGIN")" = OAuthPluginVault ] && [ "$(jq -r '.runtimes[0].auth.reference_id' "$CP_PLUGIN")" = "$CP_PLACEHOLDER" ]
+}
+copilot_tools_are_discovered() {
+  [ "$(jq -c .functions "$CP_PLUGIN")" = '[]' ] && [ "$(jq -c '.runtimes[0].run_for_functions' "$CP_PLUGIN")" = '["*"]' ] && [ "$(jq -r '.runtimes[0].spec | has("mcp_tool_description")' "$CP_PLUGIN")" = false ]
+}
+copilot_instructions_name_load_context() {
+  jq -e '.instructions | contains("load_context") and contains("cursor") and (length <= 8000)' "$CP/declarativeAgent.json" >/dev/null &&
+    jq -e '.description_for_model | contains("load_context")' "$CP_PLUGIN" >/dev/null
+}
+copilot_icons_have_their_sizes() {
+  [ "$(jq -r '.icons.color' "$CP/manifest.json")" = color.png ] && [ "$(jq -r '.icons.outline' "$CP/manifest.json")" = outline.png ] &&
+    [ "$(png_dims "$CP/color.png")" = 192x192 ] && [ "$(png_dims "$CP/outline.png")" = 32x32 ]
+}
+copilot_listing_fields() {
+  jq -e '.developer.name == "Alynki" and .developer.websiteUrl == "https://alynki.com" and .developer.privacyUrl == "https://alynki.com/privacy/" and .developer.termsOfUseUrl == "https://alynki.com/terms/" and (.name.short == "Alynki")' "$CP/manifest.json" >/dev/null &&
+    [ "$(jq -r '.conversation_starters | length >= 3' "$CP/declarativeAgent.json")" = true ] && [ "$(jq -r .name "$CP/declarativeAgent.json")" = "$(jq -r .name.short "$CP/manifest.json")" ] && no_em_dash "$CP/manifest.json" "$CP/declarativeAgent.json" "$CP_PLUGIN"
+}
+build_refuses_missing_and_placeholder() {
+  local d rc=0
+  d=$(mktemp -d) || return 1
+  ! sh -c "$CP/build.sh" >/dev/null 2>&1 && ! "$CP/build.sh" '' "$d/a.zip" >/dev/null 2>&1 && ! "$CP/build.sh" "$CP_PLACEHOLDER" "$d/b.zip" >/dev/null 2>&1 &&
+    ! "$CP/build.sh" 'ALYNKI_COPILOT_REGISTRATION_ID' "$d/c.zip" >/dev/null 2>&1 && [ -z "$(ls "$d")" ] || rc=1
+  rm -rf "$d"
+  [ "$rc" -eq 0 ]
+}
+build_zip_carries_the_id() {
+  local d rc=0
+  d=$(mktemp -d) || return 1
+  "$CP/build.sh" dummy-reg-id-123 "$d/p.zip" >/dev/null 2>&1 &&
+    [ "$(unzip -Z1 "$d/p.zip" | sort | tr '\n' ' ')" = "alynki-plugin.json color.png declarativeAgent.json manifest.json outline.png " ] &&
+    [ "$(unzip -p "$d/p.zip" alynki-plugin.json | jq -r '.runtimes[0].auth.reference_id')" = dummy-reg-id-123 ] &&
+    [ "$(unzip -p "$d/p.zip" manifest.json | jq -r .id)" = "$(jq -r .id "$CP/manifest.json")" ] &&
+    ! unzip -p "$d/p.zip" alynki-plugin.json | grep -qF 'ALYNKI_COPILOT_REGISTRATION_ID' || rc=1
+  rm -rf "$d"
+  [ "$rc" -eq 0 ]
+}
+# shellcheck disable=SC2016 # the backticks are literal Markdown
+readme_covers_copilot_package() {
+  grep -qF '## Microsoft 365 Copilot' README.md && grep -qF 'copilot/build.sh' README.md && grep -qF 'Microsoft 365 admin centre' README.md && grep -qF 'Add agent' README.md && grep -qF 'OAuthPluginVault' README.md
+}
+ok "the Copilot package's three JSON files parse" copilot_json_parses
+ok "the Copilot package is Teams manifest 1.19, declarative agent v1.6 and plugin v2.4, wired to each other, with a GUID id" copilot_schema_versions
+ok "the plugin's runtime is one RemoteMCPServer at https://mcp.alynki.com/mcp, the url the MCP files carry" copilot_runtime_url
+ok "the plugin's auth is OAuthPluginVault with the placeholder reference_id (the real id is never committed)" copilot_auth_is_the_vault
+ok "the plugin hand-lists no tool: functions empty, run_for_functions [\"*\"], no mcp_tool_description" copilot_tools_are_discovered
+ok "the agent's instructions name load_context, paging to a cursor, within 8000 characters" copilot_instructions_name_load_context
+ok "the icons are color.png 192x192 and outline.png 32x32, named by the manifest" copilot_icons_have_their_sizes
+ok "the manifest carries the developer, privacy and terms URLs; the agent has three prompt starters and the same name; no em dash" copilot_listing_fields
+ok "copilot/build.sh refuses a missing, empty or placeholder registration id and writes nothing" build_refuses_missing_and_placeholder
+ok "copilot/build.sh given a dummy id writes a zip, five files at its root, whose plugin carries the id" build_zip_carries_the_id
+ok "the README has a Microsoft 365 Copilot section: the build, the admin centre install, OAuthPluginVault" readme_covers_copilot_package
+
 echo "$n assertions, $failed failed"
 [ "$failed" -eq 0 ] || exit 1
 floor=${SETUP_CHECK_FLOOR:-0}
