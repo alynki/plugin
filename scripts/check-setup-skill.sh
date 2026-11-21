@@ -245,7 +245,7 @@ no_grok_hook() { [ ! -e alynki-plugin/.grok-plugin ]; }
 readmes_cover_the_clients() {
   local f
   for f in README.md "$PLUGIN_README"; do
-    grep -qF 'Codex CLI' "$f" && grep -qF 'Antigravity CLI' "$f" && grep -qF 'load_context' "$f" && grep -qF 'installed by hand' "$f" || return 1
+    grep -qF 'Codex CLI' "$f" && grep -qF 'Antigravity CLI' "$f" && grep -qF 'load_context' "$f" && grep -qF 'codex-hooks.json' "$f" && grep -qF 'trust' "$f" && grep -qF 'codex plugin add alynki@alynki-marketplace' "$f" || return 1
   done
 }
 ok "every MCP file (.mcp.json, mcp.json, mcp_config.json, copilot-mcp.json) names the same url, https://mcp.alynki.com/mcp" mcp_urls_all_match
@@ -258,7 +258,7 @@ ok "the Antigravity hooks.json command prints the script's output (run from the 
 ok "session-start.sh copilot prints the wording as top-level additionalContext" copilot_output_has_the_wording
 ok "session-start.sh refuses an unknown shape" unknown_shape_refused
 ok "no Grok hook ships (Grok Build session hooks cannot inject)" no_grok_hook
-ok "both READMEs cover Codex CLI, Antigravity CLI, load_context and hand installs" readmes_cover_the_clients
+ok "both READMEs cover Codex CLI (its own hook file, the one-time trust, the marketplace install), Antigravity CLI and load_context" readmes_cover_the_clients
 
 # Codex gets its own hook file (alynki/alynki#3442): Codex drops a SessionStart output carrying initialUserMessage.
 CODEXHOOKS=alynki-plugin/hooks/codex-hooks.json
@@ -422,6 +422,11 @@ copilot_tools_are_pinned() {
     [ -n "$f" ] && [ "$f" = "$r" ] && [ "$f" = "$m" ] && [ "$(jq -r '.runtimes[0].spec.mcp_tool_description.file' "$CP_PLUGIN")" = mcp-tools.json ] &&
     jq -e '[.tools[] | has("name") and has("description") and has("inputSchema")] | all' "$CP/mcp-tools.json" >/dev/null
 }
+# The admin centre refuses a function with no description (alynki/alynki#3458): each carries its tool's, from mcp-tools.json.
+copilot_functions_carry_descriptions() {
+  jq -e --slurpfile t "$CP/mcp-tools.json" '($t[0].tools | map({(.name): .description}) | add) as $d
+    | (.functions | length) > 0 and all(.functions[]; (.description // "") != "" and .description == $d[.name])' "$CP_PLUGIN" >/dev/null
+}
 copilot_pinned_tools_are_the_tool_list() {
   [ "$(jq -r '.tools[].name' "$CP/mcp-tools.json" | sort | tr '\n' ' ')" = "$(cat alynki-plugin/tools.txt alynki-plugin/ask-tools.txt 2>/dev/null | sort | tr '\n' ' ')" ]
 }
@@ -435,7 +440,9 @@ copilot_icons_have_their_sizes() {
 }
 copilot_listing_fields() {
   jq -e '.developer.name == "Alynki" and .developer.websiteUrl == "https://alynki.com" and .developer.privacyUrl == "https://alynki.com/privacy/" and .developer.termsOfUseUrl == "https://alynki.com/terms/" and (.name.short == "Alynki")' "$CP/manifest.json" >/dev/null &&
-    [ "$(jq -r '.conversation_starters | length >= 3' "$CP/declarativeAgent.json")" = true ] && [ "$(jq -r .name "$CP/declarativeAgent.json")" = "$(jq -r .name.short "$CP/manifest.json")" ] && no_em_dash "$CP/manifest.json" "$CP/declarativeAgent.json" "$CP_PLUGIN"
+    [ "$(jq -r '.conversation_starters | length >= 3' "$CP/declarativeAgent.json")" = true ] && [ "$(jq -r .name "$CP/declarativeAgent.json")" = "$(jq -r .name.short "$CP/manifest.json")" ] && no_em_dash "$CP/manifest.json" "$CP/declarativeAgent.json" &&
+    # the functions carry the server's tool descriptions verbatim (#3458), as mcp-tools.json does; the rest of the plugin is listing copy
+    ! jq 'del(.functions)' "$CP_PLUGIN" | grep -q '—'
 }
 build_refuses_missing_and_placeholder() {
   local d rc=0
@@ -466,6 +473,7 @@ ok "the plugin's runtime is one RemoteMCPServer at https://mcp.alynki.com/mcp, t
 ok "the plugin's auth is OAuthPluginVault with the placeholder reference_id (the real id is never committed)" copilot_auth_is_the_vault
 ok "the plugin pins its tools: functions, run_for_functions and mcp-tools.json name the same tools, each with a description and inputSchema" copilot_tools_are_pinned
 ok "the pinned tools are exactly the plugin's tool list" copilot_pinned_tools_are_the_tool_list
+ok "every Copilot function carries a non-empty description, its tool's from mcp-tools.json" copilot_functions_carry_descriptions
 ok "the agent's instructions name load_context, paging to a cursor, within 8000 characters" copilot_instructions_name_load_context
 ok "the icons are color.png 192x192 and outline.png 32x32, named by the manifest" copilot_icons_have_their_sizes
 ok "the manifest carries the developer, privacy and terms URLs; the agent has three prompt starters and the same name; no em dash" copilot_listing_fields
