@@ -320,7 +320,7 @@ including the one setting held in `settings.json` (*What it runs, sends and fetc
   `alynki-plugin/tools.txt`, writes an exact-name ask rule for each of the seven in `alynki-plugin/ask-tools.txt`,
   and removes the allow rules 0.29 wrote for them. `setup-antigravity.sh` removes them too. Re-run the setup on a
   machine set up by 0.29. No tool and no prompt added: 44 tools and 44 prompts. Also in 0.30.0: the Microsoft 365 Copilot
-  agent package 1.0.3 gives each function its tool's description, which the admin centre requires
+  agent package 1.0.8 gives each function its tool's description, which the admin centre requires
   (`copilot/gen-tools.sh` writes them), and the Codex section names `hooks/codex-hooks.json` and the one-time hook trust.
 - `alynki` 0.29.1: Codex now receives the load-first instruction. Codex ran the hook but dropped its output,
   because the Claude `SessionStart` shape carries `initialUserMessage`, which Codex does not accept; the Codex
