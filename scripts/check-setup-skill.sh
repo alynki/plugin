@@ -13,6 +13,7 @@ cd "$(dirname "$0")/.." || exit 1
 SKILL=alynki-plugin/skills/setup/SKILL.md
 STD=alynki-plugin/.claude-plugin/plugin.json
 LIST=alynki-plugin/tools.txt
+ASKLIST=alynki-plugin/ask-tools.txt
 AGYSET=alynki-plugin/bin/setup-antigravity.sh
 
 n=0
@@ -332,30 +333,35 @@ ok "the Copilot MCP config is wrapped in mcpServers with type http and a url" co
 ok "the Antigravity root hooks.json is named groups with no Copilot keys, and its manifest has no hooks field" antigravity_hooks_are_named_groups
 ok "both READMEs cover VS Code, GitHub Copilot CLI, chat.plugins.enabled and the preview status" readmes_cover_copilot
 
-# One list for every setup (alynki/alynki#3343, D9, J8): all 44 tools allowed, the list defined once.
-list_has_44_unique() {
-  [ "$(grep -c . "$LIST")" -eq 44 ] && [ "$(sort -u "$LIST" | grep -c .)" -eq 44 ] && ! grep -qvE '^[a-z]+(_[a-z]+)+$' "$LIST"
+# One pair of lists for every setup (alynki/alynki#3343, D9, J8; SEC-31, alynki/alynki#3447): 37 tools allowed,
+# the seven access-changing tools asking, each list defined once.
+SEVEN="create_principal_agent grant_principal invite_principal revoke_principal revoke_principal_agent revoke_principal_invite update_principal_agent"
+lists_are_37_and_the_seven() {
+  [ "$(grep -c . "$LIST")" -eq 37 ] && [ "$(sort -u "$LIST" | grep -c .)" -eq 37 ] && ! grep -qvE '^[a-z]+(_[a-z]+)+$' "$LIST" &&
+    [ "$(sort "$ASKLIST" | tr '\n' ' ' | sed 's/ $//')" = "$SEVEN" ] && [ -z "$(sort "$LIST" "$ASKLIST" | uniq -d)" ]
 }
 # A sample of names must appear in no other plugin file (the READMEs describe the tools; the hook wording names load_context).
 SAMPLE="grant_principal list_runs create_workflow delete_workflow save_check move_node revoke_principal_agent"
 no_second_copy() {
   local t
   for t in $SAMPLE; do
-    grep -qx "$t" "$LIST" || return 1
-    if grep -rlw --exclude-dir=.git --exclude=tools.txt --exclude=README.md --exclude=load-first.md -- "$t" alynki-plugin .claude-plugin | grep -q .; then return 1; fi
+    grep -qx "$t" "$LIST" "$ASKLIST" || return 1
+    if grep -rlw --exclude-dir=.git --exclude=tools.txt --exclude=ask-tools.txt --exclude=README.md --exclude=load-first.md -- "$t" alynki-plugin .claude-plugin | grep -q .; then return 1; fi
   done
 }
-# Run the Antigravity script under a temporary HOME holding other settings: it merges, a second run is byte-identical.
+# Run the Antigravity script under a temporary HOME holding other settings and the allow rules 0.29 wrote for two of
+# the seven: it merges the 37, removes the seven's allow rules, and a second run is byte-identical.
 agy_idempotent() {
   local h f a ok=1
   h=$(mktemp -d) || return 1
   f=$h/.gemini/antigravity-cli/settings.json
   mkdir -p "$(dirname "$f")"
-  printf '{"theme":"dark","permissions":{"deny":["command(sudo)"],"allow":["command(git)"]}}' >"$f"
+  printf '{"theme":"dark","permissions":{"deny":["command(sudo)"],"allow":["command(git)","mcp(alynki/grant_principal)","mcp(alynki/revoke_principal_agent)"]}}' >"$f"
   HOME=$h sh "$AGYSET" >/dev/null && cp "$f" "$h/first" && HOME=$h sh "$AGYSET" >/dev/null && cmp -s "$h/first" "$f" &&
     [ "$(jq -r '.theme' "$f")" = dark ] && [ "$(jq -c '.permissions.deny' "$f")" = '["command(sudo)"]' ] &&
-    [ "$(jq -r '.permissions.allow[0]' "$f")" = 'command(git)' ] && [ "$(jq -r '[.permissions.allow[] | select(startswith("mcp(alynki/"))] | length' "$f")" -eq 44 ] &&
-    [ "$(jq -r '.permissions.allow | length' "$f")" -eq 45 ] || ok=0
+    [ "$(jq -r '.permissions.allow[0]' "$f")" = 'command(git)' ] && [ "$(jq -r '[.permissions.allow[] | select(startswith("mcp(alynki/"))] | length' "$f")" -eq 37 ] &&
+    [ "$(jq -r '.permissions.allow | length' "$f")" -eq 38 ] || ok=0
+  for a in $SEVEN; do jq -e --arg r "mcp(alynki/$a)" '.permissions.allow | index($r) == null' "$f" >/dev/null || ok=0; done
   rm -rf "$h"
   [ "$ok" -eq 1 ]
 }
@@ -368,14 +374,23 @@ agy_refuses_bad_json() {
   rm -rf "$h"
   [ "$ok" -eq 1 ]
 }
-ok "the tool list has exactly 44 unique names, one per line" list_has_44_unique
+ok "tools.txt has exactly 37 unique names and ask-tools.txt exactly the seven access-changing tools, with no name in both" lists_are_37_and_the_seven
 skill_reads_list_no_wildcard() { grep -qF 'tools.txt' "$SKILL" && grep -qF 'never a wildcard' "$SKILL" && ! grep -qE 'Add .*mcp__plugin_alynki_alynki__\*' "$SKILL"; }
 ok "the Claude setup skill reads the shared list (tools.txt) and its add step writes exact names, never a wildcard" skill_reads_list_no_wildcard
+skill_asks_the_seven() {
+  grep -qF 'ask-tools.txt' "$SKILL" && grep -qF 'one rule in `permissions.ask` per tool in `ask-tools.txt`' "$SKILL" &&
+    grep -qF 'remove** from `permissions.allow` the exact rule of any tool in `ask-tools.txt`' "$SKILL" &&
+    grep -qF 'still ask a person each time' "$SKILL" && absent 'All 44 tools are allowed' "$SKILL"
+}
+ok "the Claude setup skill writes an ask rule for each of the seven and removes their allow rules" skill_asks_the_seven
 ok "the Antigravity script reads the shared list (tools.txt)" grep -qF 'tools.txt' "$AGYSET"
+ok "the Antigravity script reads the asking list (ask-tools.txt)" grep -qF 'ask-tools.txt' "$AGYSET"
 ok "no tool name outside the list file appears in the plugin's skill, scripts or manifests (no second copy)" no_second_copy
 ok "the Antigravity script merges and is idempotent under a temporary HOME (two runs, cmp)" agy_idempotent
 ok "the Antigravity script leaves an unparseable settings file untouched" agy_refuses_bad_json
 ok "both READMEs describe the setup per client and the shared list" bash -c 'grep -qF tools.txt README.md && grep -qF setup-antigravity.sh README.md && grep -qF setup-antigravity.sh alynki-plugin/README.md'
+ok "both READMEs say the seven access-changing tools ask (ask-tools.txt)" bash -c 'grep -qF ask-tools.txt README.md && grep -qF ask-tools.txt alynki-plugin/README.md'
+ok "the standard plugin's version is at least 0.30.0, the release in which the seven ask again" version_at_least "$STD" 0.30.0
 
 # The Microsoft 365 Copilot agent package (alynki/alynki#3357, D8, J12): Teams manifest 1.19, declarative agent v1.6, plugin v2.4,
 # sources under copilot/ (not in alynki-plugin/, which is the Claude, Codex and Antigravity plugin), built into a zip by copilot/build.sh.

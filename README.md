@@ -262,25 +262,25 @@ Run once, in any session:
 ```
 
 It shows the edit, then adds to your own `~/.claude/settings.json`, machine-wide, one exact-name rule
-per Alynki tool in `permissions.allow`: all 44, the seven that change who has access or manage the
-agents (`grant_principal`, `revoke_principal`, `invite_principal`, `revoke_principal_invite`,
-`create_principal_agent`, `update_principal_agent`, `revoke_principal_agent`) included. The
+in `permissions.allow` for each of 37 Alynki tools, and one exact-name rule in `permissions.ask` for
+each of the seven that change who has access or manage the agents (`grant_principal`,
+`revoke_principal`, `invite_principal`, `revoke_principal_invite`, `create_principal_agent`,
+`update_principal_agent`, `revoke_principal_agent`). The seven ask a person before every call, so text
+an agent reads (a node body, a run record) cannot steer an access change unseen. The
 `plugin_alynki_alynki` segment is exact, so the rules can only match Alynki's own server. On a machine
-set up by an earlier version it also removes the seven ask rules that version wrote.
+set up by 0.29 it also removes the allow rules that version wrote for the seven.
 
-The list is one file, [`alynki-plugin/tools.txt`](alynki-plugin/tools.txt), one tool name per line.
-Every setup reads it and none holds a copy. A tool the server adds later is covered once the list
-gains it and the setup is run again.
-
-⚠️ With no prompt, text an agent reads (a node body, a run record) can steer an access-changing call
-such as `grant_principal` without a person seeing it first. The server's entitlement checks still
-bound what that call can do.
+The lists are two files, one tool name per line: [`alynki-plugin/tools.txt`](alynki-plugin/tools.txt)
+(the 37 allowed) and [`alynki-plugin/ask-tools.txt`](alynki-plugin/ask-tools.txt) (the seven that
+ask). Every setup reads them and none holds a copy. A tool the server adds later is covered once a
+list gains it and the setup is run again.
 
 ⚠️ **This command still prompts once, for its own write.** `~/.claude` is a protected path, so no
 allow rule suppresses that prompt. It removes every *subsequent* Alynki prompt, not its own.
 
-To grant it by hand, add one `permissions.allow` entry per line of `tools.txt` to
-`~/.claude/settings.json`, keeping existing entries:
+To grant it by hand, add one `permissions.allow` entry per line of `tools.txt` and one
+`permissions.ask` entry per line of `ask-tools.txt` to `~/.claude/settings.json`, keeping existing
+entries:
 
 ```json
 {
@@ -288,19 +288,22 @@ To grant it by hand, add one `permissions.allow` entry per line of `tools.txt` t
     "allow": [
       "mcp__plugin_alynki_alynki__load_context",
       "mcp__plugin_alynki_alynki__save_context"
+    ],
+    "ask": [
+      "mcp__plugin_alynki_alynki__grant_principal"
     ]
   }
 }
 ```
 
-(Two entries shown; the real list has 44.)
+(Three entries shown; the real lists have 37 and 7.)
 
 ### Setup per client
 
 | Client | Setup |
 |---|---|
 | Claude Code | `/alynki:setup`, above. |
-| Antigravity CLI | `sh alynki-plugin/bin/setup-antigravity.sh` from a clone. It merges `mcp(alynki/<tool>)` rules for the 44 interactive tools into `permissions.allow` of `~/.gemini/antigravity-cli/settings.json`, keeps every other entry, and a second run changes nothing. Needs `jq`. Antigravity documents `mcp(server/*)` and `mcp(*)` wildcards too; the script writes the explicit list. |
+| Antigravity CLI | `sh alynki-plugin/bin/setup-antigravity.sh` from a clone. It merges `mcp(alynki/<tool>)` rules for the 37 tools in `tools.txt` into `permissions.allow` of `~/.gemini/antigravity-cli/settings.json` and removes any allow rule for the seven in `ask-tools.txt`, so Antigravity asks before each of those; it keeps every other entry, and a second run changes nothing. Needs `jq`. Antigravity documents `mcp(server/*)` and `mcp(*)` wildcards too; the script writes the explicit list. |
 | Codex CLI, VS Code, GitHub Copilot CLI | No local permission file is written here; approve per your client's own prompt. |
 | ChatGPT, Microsoft 365 Copilot, grok.com | Approval is set in the product, not on this machine; see the documentation page at https://alynki.com/docs/. |
 
@@ -311,6 +314,12 @@ including the one setting held in `settings.json` (*What it runs, sends and fetc
 
 ## Release notes
 
+- `alynki` 0.30.0: `/alynki:setup` asks again before the seven access-changing tools (`grant_principal`,
+  `revoke_principal`, `invite_principal`, `revoke_principal_invite`, `create_principal_agent`,
+  `update_principal_agent`, `revoke_principal_agent`), reversing 0.29.0's allow-all: it allows the 37 tools in
+  `alynki-plugin/tools.txt`, writes an exact-name ask rule for each of the seven in `alynki-plugin/ask-tools.txt`,
+  and removes the allow rules 0.29 wrote for them. `setup-antigravity.sh` removes them too. Re-run the setup on a
+  machine set up by 0.29. No tool and no prompt added: 44 tools and 44 prompts.
 - `alynki` 0.29.1: Codex now receives the load-first instruction. Codex ran the hook but dropped its output,
   because the Claude `SessionStart` shape carries `initialUserMessage`, which Codex does not accept; the Codex
   manifest now names `hooks/codex-hooks.json`, whose `codex` shape prints `additionalContext` only. Claude Code's

@@ -1,7 +1,6 @@
 create_check
 create_inherited_check
 create_node
-create_principal_agent
 create_run
 create_step
 create_trigger
@@ -10,8 +9,6 @@ delete_inherited_check
 delete_node
 delete_run
 delete_workflow
-grant_principal
-invite_principal
 list_checks
 list_connections
 list_inherited_checks
@@ -31,14 +28,10 @@ move_inherited_check
 move_node
 move_workflow
 release_run
-revoke_principal
-revoke_principal_agent
-revoke_principal_invite
 save_check
 save_context
 save_run
 set_default_context
 start_run
 update_node
-update_principal_agent
 update_workflow
