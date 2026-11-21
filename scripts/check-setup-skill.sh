@@ -434,6 +434,14 @@ copilot_instructions_name_load_context() {
   jq -e '.instructions | contains("load_context") and contains("cursor") and (length <= 8000)' "$CP/declarativeAgent.json" >/dev/null &&
     jq -e '.description_for_model | contains("load_context")' "$CP_PLUGIN" >/dev/null
 }
+copilot_first_chat_connects() {
+  # the first chat only connects (#3463): Copilot calls no tool again in the chat where the person signed in,
+  # so the agent offers a Connect starter and sends questions to a new chat; wording that the tools are
+  # unavailable or cannot be called empties Copilot's function table, so it must never appear
+  jq -e '.conversation_starters[0] == {"title": "Connect to Alynki", "text": "Connect me to Alynki"}' "$CP/declarativeAgent.json" >/dev/null &&
+    jq -e '(.instructions | split("\n\n"))[2] | startswith("When the person has just allowed the connection or signed in to Alynki") and contains("call the tools again")' "$CP/declarativeAgent.json" >/dev/null &&
+    ! jq -r .instructions "$CP/declarativeAgent.json" | grep -qiE 'unavailable|not available|cannot be called|can not be called'
+}
 copilot_icons_have_their_sizes() {
   [ "$(jq -r '.icons.color' "$CP/manifest.json")" = color.png ] && [ "$(jq -r '.icons.outline' "$CP/manifest.json")" = outline.png ] &&
     [ "$(png_dims "$CP/color.png")" = 192x192 ] && [ "$(png_dims "$CP/outline.png")" = 32x32 ]
@@ -469,6 +477,7 @@ readme_covers_copilot_package() {
 }
 ok "the Copilot package's three JSON files parse" copilot_json_parses
 ok "the Copilot package is Teams manifest 1.19, declarative agent v1.6 and plugin v2.4, wired to each other, with a GUID id" copilot_schema_versions
+ok "the Copilot agent opens with a Connect starter, says to ask in a new chat after a sign-in, and never calls its tools unavailable" copilot_first_chat_connects
 ok "the plugin's runtime is one RemoteMCPServer at https://mcp.alynki.com/mcp, the url the MCP files carry" copilot_runtime_url
 ok "the plugin's auth is OAuthPluginVault with the placeholder reference_id (the real id is never committed)" copilot_auth_is_the_vault
 ok "the plugin pins its tools: functions, run_for_functions and mcp-tools.json name the same tools, each with a description and inputSchema" copilot_tools_are_pinned
