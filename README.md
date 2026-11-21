@@ -188,9 +188,10 @@ Key: diamond, a decision made by the server; rectangle, the surface a session is
 - `SessionStart` and `SubagentStart` hooks (Claude Code and Codex; Antigravity gets `SessionStart`) that
   instruct every session, and every subagent, to call `load_context` first. Each runs
   `hooks/session-start.sh`, which prints the one wording file `hooks/load-first.md` in the client's
-  shape (Claude Code and Codex: `SessionStart` emits both `initialUserMessage` and
-  `additionalContext`, `SubagentStart` emits `additionalContext`; Antigravity: an injected
-  `systemMessage`). The text names only `load_context`, which every credential class holds.
+  shape (Claude Code: `SessionStart` emits both `initialUserMessage` and `additionalContext`; Codex,
+  from its own `hooks/codex-hooks.json`: `SessionStart` emits `additionalContext` only, because Codex drops
+  an output carrying a field it does not know; `SubagentStart` emits `additionalContext` in both;
+  Antigravity: an injected `systemMessage`). The text names only `load_context`, which every credential class holds.
 
 ## Working a run
 
@@ -310,6 +311,10 @@ including the one setting held in `settings.json` (*What it runs, sends and fetc
 
 ## Release notes
 
+- `alynki` 0.29.1: Codex now receives the load-first instruction. Codex ran the hook but dropped its output,
+  because the Claude `SessionStart` shape carries `initialUserMessage`, which Codex does not accept; the Codex
+  manifest now names `hooks/codex-hooks.json`, whose `codex` shape prints `additionalContext` only. Claude Code's
+  hook output is unchanged. No tool and no prompt added: 44 tools and 44 prompts.
 - `alynki` 0.29.0: one plugin for every client. One wording file (`alynki-plugin/hooks/load-first.md`) and one
   script (`alynki-plugin/hooks/session-start.sh`) start each session and subagent with `load_context` in Claude Code,
   Codex CLI, Antigravity CLI, VS Code and GitHub Copilot CLI, each from its own manifest and MCP file at the one
