@@ -9,6 +9,8 @@
 # ones Copilot gets); it is read with cat, sent only as the Authorization header, never printed.
 # Writes each tool's name, description, inputSchema and annotations, sorted by name, then refuses
 # unless the names equal the plugin's tool list (alynki-plugin/tools.txt and ask-tools.txt when present).
+# Then sets alynki-plugin.json's functions ({name, description}: the admin centre requires a description
+# on each function, alynki/alynki#3458) and run_for_functions to the same tools, in the same order.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 tf=${1:?usage: copilot/gen-tools.sh <token-file> [url]}
@@ -28,4 +30,7 @@ want=$(cat "$here/../alynki-plugin/tools.txt" "$here/../alynki-plugin/ask-tools.
 got=$(jq -r '.tools[].name' "$here/mcp-tools.json.new" | sort)
 [ "$got" = "$want" ] || { rm -f "$here/mcp-tools.json.new"; echo "gen-tools.sh: the server's tools differ from the plugin's tool list; update the list first" >&2; exit 1; }
 mv "$here/mcp-tools.json.new" "$here/mcp-tools.json"
-echo "wrote $here/mcp-tools.json ($(jq '.tools | length' "$here/mcp-tools.json") tools); now set functions and run_for_functions in alynki-plugin.json to these names"
+jq --slurpfile t "$here/mcp-tools.json" '.functions = [$t[0].tools[] | {name, description}]
+  | .runtimes[0].run_for_functions = [$t[0].tools[].name]' "$here/alynki-plugin.json" >"$here/alynki-plugin.json.new"
+mv "$here/alynki-plugin.json.new" "$here/alynki-plugin.json"
+echo "wrote $here/mcp-tools.json and the functions of $here/alynki-plugin.json ($(jq '.tools | length' "$here/mcp-tools.json") tools)"

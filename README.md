@@ -72,7 +72,7 @@ That is the whole install: **the MCP connection is bundled**, with no `claude mc
 
 ### Codex CLI
 
-Codex reads the same plugin folder (`alynki-plugin/`, with its `.codex-plugin/plugin.json`, `mcp.json` and the Claude `hooks/hooks.json`). Install it by hand from a clone of this repository, in your Codex plugin settings, then sign in when Codex first connects to `https://mcp.alynki.com/mcp`. Codex runs a plugin's hooks only for a plugin you installed by hand, and only after you review and trust them (it skips them otherwise), so the session-start instruction does not run from the public plugin directory. Without the hook, ask your agent to call `load_context` first, or rely on the server's own instructions.
+Codex reads the same plugin folder (`alynki-plugin/`): its `.codex-plugin/plugin.json` names `mcp.json` and its own hook file, `hooks/codex-hooks.json` (the `codex` shape of `session-start.sh`, which prints `additionalContext` only). Install it with `codex plugin marketplace add alynki/plugin` and `codex plugin add alynki@alynki-marketplace`, then sign in when Codex first connects to `https://mcp.alynki.com/mcp`. Codex runs a plugin's hooks only once you have reviewed and trusted them in Codex (it skips them until then), so the session-start instruction starts after that one-time trust, and does not run from the public plugin directory. Without the hook, ask your agent to call `load_context` first, or rely on the server's own instructions.
 
 ### Antigravity CLI
 
@@ -319,7 +319,9 @@ including the one setting held in `settings.json` (*What it runs, sends and fetc
   `update_principal_agent`, `revoke_principal_agent`), reversing 0.29.0's allow-all: it allows the 37 tools in
   `alynki-plugin/tools.txt`, writes an exact-name ask rule for each of the seven in `alynki-plugin/ask-tools.txt`,
   and removes the allow rules 0.29 wrote for them. `setup-antigravity.sh` removes them too. Re-run the setup on a
-  machine set up by 0.29. No tool and no prompt added: 44 tools and 44 prompts.
+  machine set up by 0.29. No tool and no prompt added: 44 tools and 44 prompts. Also in 0.30.0: the Microsoft 365 Copilot
+  agent package 1.0.3 gives each function its tool's description, which the admin centre requires
+  (`copilot/gen-tools.sh` writes them), and the Codex section names `hooks/codex-hooks.json` and the one-time hook trust.
 - `alynki` 0.29.1: Codex now receives the load-first instruction. Codex ran the hook but dropped its output,
   because the Claude `SessionStart` shape carries `initialUserMessage`, which Codex does not accept; the Codex
   manifest now names `hooks/codex-hooks.json`, whose `codex` shape prints `additionalContext` only. Claude Code's
