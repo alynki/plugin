@@ -20,7 +20,7 @@ case "$id" in
   *'${'* | *ALYNKI_COPILOT_REGISTRATION_ID* | *[[:space:]]* | *'"'* | *'\'*) die "the registration id is empty, a placeholder or has characters that do not belong in an id" ;;
 esac
 
-for f in manifest.json declarativeAgent.json alynki-plugin.json; do
+for f in manifest.json declarativeAgent.json alynki-plugin.json mcp-tools.json; do
   [ -s "$here/$f" ] || die "missing $f"
   jq -e . "$here/$f" >/dev/null || die "$f is not valid JSON"
 done
@@ -38,7 +38,7 @@ fi
 
 work=$(mktemp -d) || exit 1
 trap 'rm -rf "$work"' EXIT
-cp "$here/manifest.json" "$here/declarativeAgent.json" "$here/color.png" "$here/outline.png" "$work/"
+cp "$here/manifest.json" "$here/declarativeAgent.json" "$here/mcp-tools.json" "$here/color.png" "$here/outline.png" "$work/"
 # Substitute through jq so the id is always a JSON string, whatever it holds.
 jq --arg id "$id" --arg ph "$PLACEHOLDER" '
   if .runtimes[0].auth.reference_id == $ph then .runtimes[0].auth.reference_id = $id else error("placeholder not found in alynki-plugin.json") end
@@ -48,5 +48,5 @@ jq -e --arg id "$id" '.runtimes[0].auth.reference_id == $id' "$work/alynki-plugi
 mkdir -p "$(dirname "$out")"
 out=$(cd "$(dirname "$out")" && pwd)/$(basename "$out")
 rm -f "$out"
-(cd "$work" && zip -q -X "$out" manifest.json declarativeAgent.json alynki-plugin.json color.png outline.png) || die "zip failed"
+(cd "$work" && zip -q -X "$out" manifest.json declarativeAgent.json alynki-plugin.json mcp-tools.json color.png outline.png) || die "zip failed"
 echo "wrote $out"

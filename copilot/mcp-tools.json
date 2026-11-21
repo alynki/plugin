@@ -1,0 +1,2018 @@
+{
+  "tools": [
+    {
+      "name": "create_check",
+      "description": "Adds a check to a step — a criterion that must hold before the step's output moves on — after the step's last existing check. The check is empty; write its criterion with save_context — a run cannot start until every step and check of the workflow has one — as what approves it and what fails it (Approves when / Fails when), naming what it tests. Checks have no children. review_mode is autonomous by default (the model evaluates and decides it) or human (the model evaluates, a person decides, and the run waits). max_rejections is an agent's rejection limit on this check, 1-10, default 3. Needs context_token.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "step": {
+            "type": "string",
+            "description": "The step — a node id or the whole colon-path from the org root."
+          },
+          "label": {
+            "type": "string",
+            "description": "The check's label — unique among the step's checks."
+          },
+          "review_mode": {
+            "type": "string",
+            "enum": [
+              "autonomous",
+              "human"
+            ],
+            "description": "Optional: who decides the check. Default autonomous."
+          },
+          "max_rejections": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Optional: an agent's rejection limit on this check, 1-10. Default 3; null also takes the default."
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional: the model version this check runs on, such as claude-sonnet-5-5, taken from the catalogue the app lists. Omit or send null to name none, which means the controller's default model. A human check names none."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          }
+        },
+        "required": [
+          "step",
+          "label",
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Create Alynki check"
+      }
+    },
+    {
+      "name": "create_inherited_check",
+      "description": "Creates an inherited check in TWO CALLS: one criterion, written once, that workflow checks borrow by naming its path. Held by interactive credentials only (a person's own session), not by agents. Everyone in the organisation can read its criterion and its full path, whatever their access to the nodes above it, so write nothing in it that the organisation should not read. First call: path (the whole colon-path from the org root: the parent that exists, then the new labels, the last label being the check) and content (the criterion: what approves the work and what fails it, as markdown with links out to the evidence, not empty). The reply is a tool error that is the preview: the parent it resolved, the path it would create, expect_parent and a confirm token. It creates nothing; show it to the person. Second call: the same path and content, plus expect_parent and confirm exactly as returned. The parent must be a plain node: nothing is created under an inherited check, a workflow, a step, a check or a trigger. Needs write access on the parent. Needs context_token.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "confirm": {
+            "description": "SECOND CALL ONLY: the confirm token exactly as the first call returned it, sent with expect_parent.",
+            "type": "string"
+          },
+          "content": {
+            "description": "The criterion of the new inherited check, as markdown: what approves the work and what fails it, with links out to the evidence. Required on both calls and not empty; the second call saves the content it carries.",
+            "type": "string"
+          },
+          "context_token": {
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation.",
+            "type": "string"
+          },
+          "expect_parent": {
+            "description": "SECOND CALL ONLY: the parent node id exactly as the first call returned it, sent with confirm. The create is refused if the server now resolves a different parent.",
+            "type": "string"
+          },
+          "path": {
+            "description": "The whole colon-path from the org root: the parent that exists, then the labels to create. The last label is the inherited check; labels before it that do not exist become plain nodes. The caller must hold write access to the deepest existing node on it.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "content",
+          "context_token"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Create Alynki inherited check"
+      }
+    },
+    {
+      "name": "create_node",
+      "description": "Creates plain nodes along a path you may write, in TWO CALLS. First call: path alone — the whole intended colon-path from the org root, existing prefix plus the new labels. The server replies, as a tool error that is the preview, with the parent it resolved and the labels it would create, and creates nothing; show it to the person. Second call: the same path plus expect_parent exactly as returned, and optionally content for the new leaf (a précis with markdown links). Use list_nodes first when the person named a place informally. A workflow is created with create_workflow, a step with create_step, a check with create_check; the server names the right tool if the path lands inside one.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "The whole intended colon-path from the org root — the existing prefix plus the new tail, whose segments need not exist yet. The caller must hold write access to the deepest existing node on it."
+          },
+          "expect_parent": {
+            "type": "string",
+            "description": "REQUIRED ON THE SECOND CALL: the parent node id exactly as the first call returned it. The create is refused if the server now resolves a different parent. Omit on the first call."
+          },
+          "content": {
+            "type": "string",
+            "description": "SECOND CALL ONLY. Optional: seeds the new leaf's body, as markdown. Refused on the first call, which writes nothing."
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Create Alynki nodes"
+      }
+    },
+    {
+      "name": "create_principal_agent",
+      "description": "Creates an agent — a pinned credential that acts as you from a default node and can never reach more than you do. You must be an admin at that node. TWO CALLS. First call: send label and node without confirm; the reply is a tool error that is the preview, with the agent it would create, its expiry date and a confirm token, and creates nothing. Show that preview to the user. Second call: the same arguments plus confirm. The agent has no token and none is ever shown: it runs only once you link it to a controller in the app (Controllers, Edit, Runs as), and that controller runs its sessions. expires_in_days is days from now, null for never; default 90. Refused on a sealed organisation. The agent reaches every workflow at or beneath node and holds only the run tools: load_context, save_context, start_run, load_run, load_step, load_check, save_run and save_check.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "The agent's label — 1 to 64 letters, digits, dots, hyphens or underscores, starting and ending with a letter or digit; unique among your agents."
+          },
+          "node": {
+            "type": "string",
+            "description": "The agent's default node — a plain node where you are an admin, as a node id (from list_nodes) or the whole colon-path from the org root."
+          },
+          "expires_in_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Optional: how many days from now the agent expires, a whole number from 1 to 36500; null for never. Default 90."
+          },
+          "confirm": {
+            "type": "string",
+            "description": "SECOND CALL ONLY: the confirm token exactly as the first call returned it."
+          }
+        },
+        "required": [
+          "label",
+          "node"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Create Alynki agent"
+      }
+    },
+    {
+      "name": "create_run",
+      "description": "Creates a run — one piece of work passing through a workflow, named by label, its external id (a ticket key, a pull request, a case) — in TWO CALLS. First call: workflow and label, with context_token; the reply is a tool error that is the preview, listing the steps and checks the run would carry, and a confirm token. Show it to the person, then send the same arguments plus confirm. It starts no session: the run is announced to the controllers that cover it, and one that missed the announcement finds it at its next run ask, within about 30 seconds, and launches an agent; or a person's session calls start_run itself. With assign_to_me true the run is assigned to you instead: no controller picks it up; work it with start_run, or give it back with release_run. Refused while the workflow is blocked (disabled, or suspended by a retired model or a revoked connection) or any active step or check has no body.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workflow": {
+            "type": "string",
+            "description": "The workflow — a node id or the whole colon-path from the org root."
+          },
+          "label": {
+            "type": "string",
+            "description": "The run's label — the external id, at most 64 characters. Unique in the workflow, case-insensitively."
+          },
+          "assign_to_me": {
+            "type": "boolean",
+            "description": "Optional, default false: assign the run to you, so no controller picks it up; you work it with start_run or release it with release_run."
+          },
+          "confirm": {
+            "type": "string",
+            "description": "SECOND CALL ONLY: the confirm token exactly as the first call returned it."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          }
+        },
+        "required": [
+          "workflow",
+          "label",
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Create Alynki run"
+      }
+    },
+    {
+      "name": "create_step",
+      "description": "Appends one empty step, named label, after the last step of workflow (a node id or whole colon-path). Write its guidance with save_context before any new run: create_run refuses while a step or check has no body. Add its checks with create_check. Runs created before it carry no record for it. To reorder, archive or remove steps, use update_workflow. Needs context_token.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workflow": {
+            "type": "string",
+            "description": "The workflow — a node id or the whole colon-path from the org root."
+          },
+          "label": {
+            "type": "string",
+            "description": "The step's label — unique among the workflow's steps."
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional: the model version this action runs on, such as claude-sonnet-5-5, taken from the catalogue the app lists. Omit or send null to name none. None means the controller's default model."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          }
+        },
+        "required": [
+          "workflow",
+          "label",
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Create Alynki step"
+      }
+    },
+    {
+      "name": "create_trigger",
+      "description": "Creates a trigger on a workflow — a step's own sibling, but in TWO CALLS like create_workflow (its connection, config and filter are worth previewing). First call: workflow, label and config, with context_token; the reply is a tool error that is the preview, with a confirm token. Show it to the person, then send the same arguments plus confirm. position 0 is this workflow's start trigger (at most one); omitted, the trigger goes just before the last active step. Triggers and steps are numbered in one order by position, the start trigger being 1; this is the number the app shows. Two triggers never sit in a row and the last item is never a trigger: a step must sit between two triggers and follow the last one. connection is a connection's id (list_connections with workflow), on this workflow's node or above it; omitted, this is a schedule, judged by config's own RRULE fields instead. filter is a CEL expression over item (and, at a position after 0, trail); filter_rows is a simpler [{field, op, value}] alternative — give one, never both. check_every (seconds, 10-86400) is required with connection, omitted for a schedule.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workflow": {
+            "type": "string",
+            "description": "The workflow — a node id or the whole colon-path from the org root."
+          },
+          "label": {
+            "type": "string",
+            "description": "The trigger's label — unique among the workflow's steps and triggers."
+          },
+          "position": {
+            "type": "integer",
+            "description": "Optional: 0 is this workflow's start trigger (at most one); a step and a trigger never share a position. Omitted: the trigger goes just before the last active step."
+          },
+          "connection": {
+            "type": "string",
+            "description": "Optional: the id of a connection on this workflow's node or above it (list_connections with workflow). Omitted: a schedule trigger."
+          },
+          "config": {
+            "type": "object",
+            "description": "The trigger's config, by kind. No connection (schedule), all required: rrule, time (HH:MM), timezone (IANA), business_days (array of weekday codes, e.g. [\"MO\",\"TU\",\"WE\",\"TH\",\"FR\"]); optional: start_date, end_date. connection mcp: tool, arguments, items_pointer, id_field, timestamp_field. imap: folder. graph_drive/gdrive/storage: subfolder. command: args. http: none beyond the connection."
+          },
+          "filter": {
+            "type": "string",
+            "description": "Optional: a CEL expression over item (and, at a position after 0, trail). Mutually exclusive with filter_rows."
+          },
+          "filter_rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "op": {
+                  "type": "string"
+                },
+                "value": {}
+              },
+              "required": [
+                "field",
+                "op",
+                "value"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Optional: [{field, op, value}] rows — a simple alternative to filter for a plain conjunction of comparisons. Mutually exclusive with filter. A row compares a scalar field; the sender's address is fromAddress, toAddress and ccAddress are the same for recipients. A list field such as from, to or cc cannot be compared by a row: use filter, an expression, for it."
+          },
+          "check_every": {
+            "type": "integer",
+            "description": "Seconds, 10-86400. Required with connection; omitted for a schedule, which fires at its own times."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Optional: true creates the trigger archived. Default false."
+          },
+          "confirm": {
+            "type": "string",
+            "description": "SECOND CALL ONLY: the confirm token exactly as the first call returned it. Omit on the first call."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          }
+        },
+        "required": [
+          "workflow",
+          "label",
+          "config",
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Create Alynki trigger"
+      }
+    },
+    {
+      "name": "create_workflow",
+      "description": "Creates a workflow — ordered steps, each with ordered checks — under a plain node you may write, in TWO CALLS. First call: parent, label (the workflow's name) and shape, with context_token; the reply is a tool error that is the preview, with the tree it would create and a confirm token. Show it to the person, then send the same arguments plus confirm. shape example: [{\"step\": \"build\", \"checks\": [\"tests-green\", {\"label\": \"sign-off\", \"review_mode\": \"human\", \"max_rejections\": 2}]}]. review_mode is autonomous (default; the model decides) or human (a person decides in the app); max_rejections (1-10, default 3) is how many agent rejections a check takes before the run waits for a person. A check that borrows its criterion carries inherits: the whole colon-path of an inherited check (list_inherited_checks lists them), a path and never an id or a body; it keeps its own label, position, review_mode, max_rejections, model and archived state, and only the criterion is borrowed. Example: {\"label\": \"no-high-vulnerabilities\", \"inherits\": \"Alynki:Security:Standards:zero-high-vulnerabilities\", \"review_mode\": \"human\"}. The owners of the inherited check will see this workflow's path. Triggers and steps are numbered in one order by position, the start trigger being 1; this is the number the app shows. Two triggers never sit in a row and the last item is never a trigger: a step must sit between two triggers and follow the last one, judged in the order written: a trigger with no position takes its place in the array, between the items written either side of it. Every node is created empty: write each step's guidance and the criterion of each check that does not inherit with save_context before create_run.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parent": {
+            "type": "string",
+            "description": "The plain node the workflow goes under — a node id (from list_nodes) or the whole colon-path from the org root."
+          },
+          "label": {
+            "type": "string",
+            "description": "The workflow's label — unique among the parent's children."
+          },
+          "shape": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 64,
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "step": {
+                      "type": "string",
+                      "description": "The step's label."
+                    },
+                    "archived": {
+                      "type": "boolean",
+                      "description": "Optional: true creates the step archived — left out of every run created from it until update_workflow restores it. Default false."
+                    },
+                    "model": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Optional: the model version this action runs on, such as claude-sonnet-5-5, taken from the catalogue the app lists. Omit to keep the current value (update_workflow) or to name none (create); null clears it. None means the controller's default model."
+                    },
+                    "checks": {
+                      "type": "array",
+                      "maxItems": 16,
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "label": {
+                                "type": "string"
+                              },
+                              "review_mode": {
+                                "type": "string",
+                                "enum": [
+                                  "autonomous",
+                                  "human"
+                                ],
+                                "description": "Default autonomous."
+                              },
+                              "archived": {
+                                "type": "boolean",
+                                "description": "Optional: true creates the check archived. Default false. An archived check is left out of every run created from then on; a run ignores archived once it is created."
+                              },
+                              "max_rejections": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ],
+                                "description": "An agent's rejection limit on this check, 1-10. Omit to keep the current value (update_workflow) or take the default 3 (create); null resets it to 3."
+                              },
+                              "model": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "description": "Optional: the model version this action runs on, such as claude-sonnet-5-5, taken from the catalogue the app lists. Omit to keep the current value (update_workflow) or to name none (create); null clears it. None means the controller's default model. A human check names none."
+                              },
+                              "inherits": {
+                                "type": "string",
+                                "description": "The whole colon-path of an inherited check. Path only. Required on every check that inherits, in create_workflow and update_workflow."
+                              }
+                            },
+                            "required": [
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "description": "Optional: the checks in order — each a label (review_mode autonomous, active), or an object {label, review_mode, archived, max_rejections, model, inherits}. Place human checks after the autonomous ones."
+                    }
+                  },
+                  "required": [
+                    "step"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "trigger": {
+                      "type": "string",
+                      "description": "The trigger's label."
+                    },
+                    "position": {
+                      "type": "integer",
+                      "description": "Optional: a sort key, not the number the app shows (steps are stored at 1000, 2000, 3000). 0 is this workflow's start trigger (at most one); a step and a trigger never share a position. Omitted: the trigger takes its place in this array, between the items written either side of it."
+                    },
+                    "connection": {
+                      "type": "string",
+                      "description": "Optional: the id of a connection on this workflow's node or above it (list_connections with workflow). Omitted: a schedule trigger, judged on check_every/its own RRULE config instead."
+                    },
+                    "config": {
+                      "type": "object",
+                      "description": "The trigger's config, by kind. No connection (schedule), all required: rrule, time (HH:MM), timezone (IANA), business_days (array of weekday codes, e.g. [\"MO\",\"TU\",\"WE\",\"TH\",\"FR\"]); optional: start_date, end_date. connection mcp: tool, arguments, items_pointer, id_field, timestamp_field. imap: folder. graph_drive/gdrive/storage: subfolder. command: args. http: none beyond the connection."
+                    },
+                    "filter": {
+                      "type": "string",
+                      "description": "Optional: a CEL expression over item (and, at a position after 0, trail). Mutually exclusive with filter_rows."
+                    },
+                    "filter_rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "field": {
+                            "type": "string"
+                          },
+                          "op": {
+                            "type": "string"
+                          },
+                          "value": {}
+                        },
+                        "required": [
+                          "field",
+                          "op",
+                          "value"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Optional: [{field, op, value}] rows — a simple alternative to filter for a plain conjunction of comparisons. Mutually exclusive with filter. A row compares a scalar field; the sender's address is fromAddress, toAddress and ccAddress are the same for recipients. A list field such as from, to or cc cannot be compared by a row: use filter, an expression, for it."
+                    },
+                    "check_every": {
+                      "type": "integer",
+                      "description": "Seconds, 10-86400. Required with connection; omitted for a schedule, which fires at its own times."
+                    },
+                    "archived": {
+                      "type": "boolean",
+                      "description": "Optional: true creates the trigger archived. Default false."
+                    }
+                  },
+                  "required": [
+                    "trigger",
+                    "config"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "description": "The steps and triggers in order, each step with its checks in order. A trigger item carries \"trigger\" instead of \"step\". An empty array creates the workflow alone; steps are appended later with create_step, triggers with create_trigger."
+          },
+          "disabled": {
+            "type": "boolean",
+            "description": "Optional: true creates the workflow disabled — no run can be created from it until update_workflow enables it. Default false."
+          },
+          "confirm": {
+            "type": "string",
+            "description": "SECOND CALL ONLY: the confirm token exactly as the first call returned it. Omit on the first call."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          }
+        },
+        "required": [
+          "parent",
+          "label",
+          "shape",
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Create Alynki workflow"
+      }
+    },
+    {
+      "name": "delete_inherited_check",
+      "description": "Deletes an inherited check PERMANENTLY, with its criterion, in TWO CALLS, only when the person asked for it. Held by interactive credentials only. First call: node; the reply is a tool error that is the preview, with a confirm token. It deletes nothing; show it to the person. Second call: the same node plus confirm exactly as returned. Refused while any workflow check inherits it, archived checks included: the refusal names the checks you can read and counts the rest, and each is removed from its workflow first. Runs already created keep their copy of the criterion and never block it. Needs write access on the check's parent. Needs context_token.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "confirm": {
+            "description": "SECOND CALL ONLY: the confirm token exactly as the first call returned it.",
+            "type": "string"
+          },
+          "context_token": {
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation.",
+            "type": "string"
+          },
+          "node": {
+            "description": "The inherited check to delete: its node id (from list_inherited_checks) or its whole colon-path from the org root.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node",
+          "context_token"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Delete Alynki inherited check"
+      }
+    },
+    {
+      "name": "delete_node",
+      "description": "Deletes one leaf node PERMANENTLY — its body is destroyed and there is no undo — only when the person asked for it. Refused while the node has children, while a grant is anchored on it, while any agent, active or revoked, has it as its default node, or while it is a trigger with run records; the refusal names which, and the remedy is to remove that cause first, never to retry. A step or check is deleted even when runs used it, and changes no run already created, because each run keeps its own copy; archiving a check with update_workflow changes no run already created either. A workflow is deleted with delete_workflow. Needs write access on the node's parent.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "node": {
+            "type": "string",
+            "description": "The node to delete — a node id (from list_nodes) or the whole colon-path from the org root."
+          }
+        },
+        "required": [
+          "node"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Delete Alynki node"
+      }
+    },
+    {
+      "name": "delete_run",
+      "description": "Deletes a run that has nothing recorded — typically one created by mistake — in TWO CALLS, only when the person asked. First call: workflow and label, with context_token; the reply is a tool error that is the preview, and a confirm token; then the same plus confirm. A run with any step input or output, or any check evaluation or decision, is kept for the audit trail and refused on both calls; to stop new work, disable the workflow with update_workflow.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workflow": {
+            "type": "string",
+            "description": "The workflow — a node id or the whole colon-path from the org root."
+          },
+          "label": {
+            "type": "string",
+            "description": "The run's label."
+          },
+          "confirm": {
+            "type": "string",
+            "description": "SECOND CALL ONLY: the confirm token exactly as the first call returned it."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          }
+        },
+        "required": [
+          "workflow",
+          "label",
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Delete Alynki run"
+      }
+    },
+    {
+      "name": "delete_workflow",
+      "description": "Deletes a workflow and every step and check beneath it PERMANENTLY, in TWO CALLS, only when the person asked for it. First call: node with context_token; the reply is a tool error that is the preview, counting what would be deleted, and a confirm token; then the same plus confirm. Refused while the workflow has any run, and a run with anything recorded is kept for the audit trail and cannot be deleted — so a workflow that has been worked is retired with update_workflow and disabled true instead. Also refused while a grant or an agent is anchored beneath it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "node": {
+            "type": "string",
+            "description": "The workflow — a node id or the whole colon-path from the org root."
+          },
+          "confirm": {
+            "type": "string",
+            "description": "SECOND CALL ONLY: the confirm token exactly as the first call returned it."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          }
+        },
+        "required": [
+          "node",
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Delete Alynki workflow"
+      }
+    },
+    {
+      "name": "grant_principal",
+      "description": "Gives one person — by email — read, write or admin access at a node or workflow and everything beneath it, or changes the role they hold there directly. TWO CALLS. First call: send node, email and role without confirm; the reply is a tool error that is the preview, with each of that person's sign-ins, the role they hold there now and where it comes from, the new role and the email they will be sent, plus a confirm token, and changes nothing. Show that preview to the user. Second call: the same arguments plus confirm. A writer may give read or write, adding only; giving admin, lowering a role, and giving anyone who has not set up their account need admin. You cannot change your own access. Someone with no account yet is added with invite_principal, not here.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "node": {
+            "type": "string",
+            "description": "The node or workflow — a node id (from list_nodes) or the whole colon-path from the org root. Access covers everything beneath it."
+          },
+          "email": {
+            "type": "string",
+            "description": "The person's email — every sign-in of this organisation with that address changes together."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "read",
+              "write",
+              "admin"
+            ],
+            "description": "read, write or admin."
+          },
+          "confirm": {
+            "type": "string",
+            "description": "SECOND CALL ONLY: the confirm token exactly as the first call returned it."
+          }
+        },
+        "required": [
+          "node",
+          "email",
+          "role"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false,
+        "title": "Grant Alynki access"
+      }
+    },
+    {
+      "name": "invite_principal",
+      "description": "Invites a person — by email — onto a node or workflow with read, write or admin access. TWO CALLS. First call: send email, node and role without confirm; the reply is a tool error that is the preview, with what would happen — a new person is sent an invitation email with a link; someone invited before who has not set up their account is sent a fresh link; someone who already has an account is given the access and an access notice — plus a confirm token, and changes nothing. Show that preview to the user. Second call: the same arguments plus confirm. Needs admin on the node or above. Only to this organisation's email domains, and not on an organisation that signs in through its identity provider. The link is never returned; the result reports invited, mail and mail_sent. Someone who already has an account is given access with grant_principal.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The person's email — it must be in one of this organisation's email domains."
+          },
+          "node": {
+            "type": "string",
+            "description": "The node or workflow they are invited onto — a node id (from list_nodes) or the whole colon-path from the org root."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "read",
+              "write",
+              "admin"
+            ],
+            "description": "read, write or admin."
+          },
+          "first_name": {
+            "type": "string",
+            "description": "Optional: the person's first name, used when they are new."
+          },
+          "surname": {
+            "type": "string",
+            "description": "Optional: the person's surname, used when they are new."
+          },
+          "confirm": {
+            "type": "string",
+            "description": "SECOND CALL ONLY: the confirm token exactly as the first call returned it."
+          }
+        },
+        "required": [
+          "email",
+          "node",
+          "role"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false,
+        "title": "Invite Alynki person"
+      }
+    },
+    {
+      "name": "list_checks",
+      "description": "Lists a workflow's checks — id, node, the step each belongs to, label, review_mode, max_rejections and inherits (the inherited check it borrows its criterion from, a path or null) — never criteria or run decisions. Use it for the checks alone; load_workflow gives the whole shape in order, load_check a criterion, load_run a run's decisions. Needs context_token.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workflow": {
+            "type": "string",
+            "description": "The workflow — a node id or the whole colon-path from the org root."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          }
+        },
+        "required": [
+          "workflow",
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "List Alynki checks"
+      }
+    },
+    {
+      "name": "list_connections",
+      "description": "Lists the connections at the caller's node and below: id, label, kind, the node they belong to and status (working, needs_attention, not_signed_in or revoked; revoked wins). Never settings, never a secret. Revoked connections are listed with status revoked and cannot be put on a trigger. A trigger can use a connection on its workflow's node or above it, not beneath, so one above your node is not in this list: to find the connections a workflow's triggers may use, call it with workflow, which answers id, label and kind of the non-revoked connections at or above that workflow and needs write on it. Use it to find a connection to put on a trigger with create_trigger, or to check what an admin has already set up before asking them to create another. Ordered by label. Needs context_token. Answers one page of 10 rows with total (the rows matching your arguments) and next_cursor: while next_cursor is not null, call again with cursor set to it and the same arguments; null means you have every row. Rows that change between calls can be missed or repeated; list again from the first page for a current view. When total is large, narrow with node or query rather than paging through every row.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "node": {
+            "type": "string",
+            "description": "Optional: a node id (from list_nodes) or the whole colon-path from the org root. Only connections on this node and below. Omit for every connection at your node and below. Cannot be combined with workflow."
+          },
+          "query": {
+            "type": "string",
+            "description": "Optional: only rows whose label contains this text, ignoring case; at most 200 characters (longer is refused, as is text with a NUL or that is not valid UTF-8). Omit for every row."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Optional: the next_cursor value from this tool's previous answer — not a cursor from a load_context, load_step or load_check trailer — sent again with the same other arguments, for the next page. Omit for the first page; never send an empty string or null. A cursor this tool did not issue for these arguments, or one older than an hour, is refused: list again without one. If your context token expires meanwhile, call load_context again and continue with the same cursor."
+          },
+          "workflow": {
+            "type": "string",
+            "description": "Optional: a workflow id (from list_workflows) or the whole colon-path from the org root. Returns only the connections that workflow's triggers may use: not revoked, at or above the workflow's node, as id, label and kind. Needs write on the workflow. Cannot be combined with node."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          }
+        },
+        "required": [
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "List Alynki connections"
+      }
+    },
+    {
+      "name": "list_inherited_checks",
+      "description": "Lists every inherited check in the organisation: id, full path and label, in path order. Held by interactive credentials only. Anyone in the organisation can list them, whatever their access: the labels of ancestors outside your access appear in the path, their content never. Use it to find the path a workflow check names when it inherits, or the id that list_runs takes as inherited_check. With query, only those whose path contains the text. Needs context_token. Answers one page of 10 rows with total (the rows matching your arguments) and next_cursor: while next_cursor is not null, call again with cursor set to it and the same arguments; null means you have every row. Rows that change between calls can be missed or repeated; list again from the first page for a current view. When total is large, narrow with query rather than paging through every row.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "context_token": {
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation.",
+            "type": "string"
+          },
+          "cursor": {
+            "description": "Optional: the next_cursor value from this tool's previous answer (not a cursor from a load_context, load_step or load_check trailer), sent again with the same other arguments, for the next page. Omit for the first page; never send an empty string or null. A cursor this tool did not issue for these arguments, or one older than an hour, is refused: list again without one. If your context token expires meanwhile, call load_context again and continue with the same cursor.",
+            "type": "string"
+          },
+          "query": {
+            "description": "Optional: only rows whose full path contains this text, ignoring case; at most 200 characters (longer is refused, as is text with a NUL or that is not valid UTF-8). Omit for every row.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "context_token"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "List Alynki inherited checks"
+      }
+    },
+    {
+      "name": "list_nodes",
+      "description": "Lists the nodes this credential can see, in the tree's depth-first order: id, node (the whole colon-path from the org root), kind (node, workflow, step, check or trigger) and whether you may write it — never a body. Call it with query to turn a name the person used into an exact address before another call; with node, only that node and everything beneath it at any depth; with kind, only nodes of that kind. Without node and kind, structural entries — ancestors shown for orientation only, which cannot be loaded or saved — appear too. To read a body, use load_context for a plain node, or load_workflow, load_step or load_check. Answers one page of 10 rows with total (the rows matching your arguments) and next_cursor: while next_cursor is not null, call again with cursor set to it and the same arguments; null means you have every row. Rows that change between calls can be missed or repeated; list again from the first page for a current view. When total is large, narrow with query, node or kind rather than paging through every row.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Optional: only rows whose address contain this text, ignoring case; at most 200 characters (longer is refused, as is text with a NUL or that is not valid UTF-8). Omit for every row."
+          },
+          "node": {
+            "type": "string",
+            "description": "Optional: a node id (from list_nodes) or the whole colon-path from the org root. Only that node and everything beneath it."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "node",
+              "workflow",
+              "step",
+              "check",
+              "trigger"
+            ],
+            "description": "Optional: only nodes of this kind."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Optional: the next_cursor value from this tool's previous answer — not a cursor from a load_context, load_step or load_check trailer — sent again with the same other arguments, for the next page. Omit for the first page; never send an empty string or null. A cursor this tool did not issue for these arguments, or one older than an hour, is refused: list again without one. If your context token expires meanwhile, call load_context again and continue with the same cursor."
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "List Alynki nodes"
+      }
+    },
+    {
+      "name": "list_pending_checks",
+      "description": "Lists every check within your reach that waits on a person: its evaluation is written and it has no decision. One row per check per run, with ids and labels — never a body. People decide these in the app (Waiting on me), never through a tool. Rejected checks are not listed: they are an agent's rework — the run becomes the agent's turn again, picked up through a controller's own run reservation. A paused or terminated run's checks are not listed. Empty is a normal answer. Needs context_token. Answers one page of 10 rows with total (the rows matching your arguments) and next_cursor: while next_cursor is not null, call again with cursor set to it and the same arguments; null means you have every row. Rows that change between calls can be missed or repeated; list again from the first page for a current view. count is the number of rows in this answer (at most 10); total is every row waiting in your reach.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "Optional: the next_cursor value from this tool's previous answer — not a cursor from a load_context, load_step or load_check trailer — sent again with the same other arguments, for the next page. Omit for the first page; never send an empty string or null. A cursor this tool did not issue for these arguments, or one older than an hour, is refused: list again without one. If your context token expires meanwhile, call load_context again and continue with the same cursor."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          }
+        },
+        "required": [
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "List Alynki pending checks"
+      }
+    },
+    {
+      "name": "list_principal_agents",
+      "description": "Lists your agents and, if you are an admin, the agents of other people whose default node is at or below a node you are admin on: label, owner email, default node, status (active, expired or revoked), expires_at (null means never), the controllers each is linked to (an empty list means not linked), created_at and last_used_at. An agent has no token. Revoke one with revoke_principal_agent; change its name or expiry with update_principal_agent. Revoked and expired agents are listed, with their status. Ordered by owner email, then label. Answers one page of 10 rows with total (the rows matching your arguments) and next_cursor: while next_cursor is not null, call again with cursor set to it and the same arguments; null means you have every row. Rows that change between calls can be missed or repeated; list again from the first page for a current view. When total is large, narrow with query rather than paging through every row.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Optional: only rows whose label or owner email contain this text, ignoring case; at most 200 characters (longer is refused, as is text with a NUL or that is not valid UTF-8). Omit for every row."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Optional: the next_cursor value from this tool's previous answer — not a cursor from a load_context, load_step or load_check trailer — sent again with the same other arguments, for the next page. Omit for the first page; never send an empty string or null. A cursor this tool did not issue for these arguments, or one older than an hour, is refused: list again without one. If your context token expires meanwhile, call load_context again and continue with the same cursor."
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "List Alynki agents"
+      }
+    },
+    {
+      "name": "list_principals",
+      "description": "Lists the people of this organisation. Without node: everyone, as the Users screen shows them — names, email, how they sign in, default node, status (active or invited, with the invitation's expiry), the uppermost node within your reach they read, write and — where you may open their row — administer from, and whether you may open it. With node: the people who have access at that node or workflow — email, name, role, and whether it is direct or inherited — as far as your reach goes. Never a token and never an invitation link. Use it before grant_principal or revoke_principal to see who holds what; agents are listed by list_principal_agents. Ordered by email. Answers one page of 10 rows with total (the rows matching your arguments) and next_cursor: while next_cursor is not null, call again with cursor set to it and the same arguments; null means you have every row. Rows that change between calls can be missed or repeated; list again from the first page for a current view. When total is large, narrow with query or node rather than paging through every row.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "node": {
+            "type": "string",
+            "description": "Optional: a node id (from list_nodes) or the whole colon-path from the org root. Lists who has access there instead of the whole roster."
+          },
+          "query": {
+            "type": "string",
+            "description": "Optional: only rows whose first name, surname or email contain this text, ignoring case; at most 200 characters (longer is refused, as is text with a NUL or that is not valid UTF-8). Omit for every row."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Optional: the next_cursor value from this tool's previous answer — not a cursor from a load_context, load_step or load_check trailer — sent again with the same other arguments, for the next page. Omit for the first page; never send an empty string or null. A cursor this tool did not issue for these arguments, or one older than an hour, is refused: list again without one. If your context token expires meanwhile, call load_context again and continue with the same cursor."
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "List Alynki people"
+      }
+    },
+    {
+      "name": "list_runs",
+      "description": "Lists runs in your reach, newest change first: label, workflow (id and node), created time, updated time (the time of the run's last change) and state — never their records. Without workflow, every workflow in your reach; with workflow, only that one. state is one of: human (a person must act — a human check to decide, a run held at a limit (load_run calls it held) to retry in the app, or a run assigned to a person, who starts it with start_run or frees it with release_run; not the same as a check's review_mode human), trigger (waiting for its trigger), ready (a controller or an agent session may start it with start_run), paused (resumed by a person in the app), running (an agent holds it now), complete, terminated. A run of a disabled or suspended workflow keeps its state, but start_run refuses it. The first page also carries counts: how many runs are in each of the seven states for your reach, workflow and query, whatever state you sent (it has no total). query matches the run label, so search by a fragment you know, such as a ticket key. Read a run with load_run, using the row's workflow and label. list_pending_checks lists only human checks waiting on a decision, not held or assigned runs. Needs context_token. Answers one page of 10 rows with next_cursor: while next_cursor is not null, call again with cursor set to it and the same arguments; null means you have every row. Rows that change between calls can be missed or repeated; list again from the first page for a current view. When there are many, narrow with workflow, state or query rather than paging through every row.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workflow": {
+            "type": "string",
+            "description": "Optional: only this workflow's runs — a node id or the whole colon-path from the org root. Omit for every workflow in your reach."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "human",
+              "trigger",
+              "ready",
+              "paused",
+              "running",
+              "complete",
+              "terminated"
+            ],
+            "description": "Optional: only runs in this state."
+          },
+          "query": {
+            "type": "string",
+            "description": "Optional: only rows whose label contain this text, ignoring case; at most 200 characters (longer is refused, as is text with a NUL or that is not valid UTF-8). Omit for every row."
+          },
+          "inherited_check": {
+            "type": "string",
+            "description": "Optional: the id of an inherited check. Only runs with a check that was copied from it when the run was created, within your reach."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Optional: the next_cursor value from this tool's previous answer — not a cursor from a load_context, load_step or load_check trailer — sent again with the same other arguments, for the next page. Omit for the first page; never send an empty string or null. A cursor this tool did not issue for these arguments, or one older than an hour, is refused: list again without one. If your context token expires meanwhile, call load_context again and continue with the same cursor."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          }
+        },
+        "required": [
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "List Alynki runs"
+      }
+    },
+    {
+      "name": "list_workflows",
+      "description": "Lists the workflows in your reach, each with its id and node, in the tree's order. With node, only workflows beneath it at any depth (not the node itself); with query, only those whose address contains the text. Use it to find a workflow's exact address before load_workflow, create_run or list_runs. With inherited_check, only the workflows in your reach that have a check inheriting it. It returns no steps, checks or runs: the shape comes from load_workflow, the runs from list_runs. Needs context_token. Answers one page of 10 rows with total (the rows matching your arguments) and next_cursor: while next_cursor is not null, call again with cursor set to it and the same arguments; null means you have every row. Rows that change between calls can be missed or repeated; list again from the first page for a current view. When total is large, narrow with node or query rather than paging through every row.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "node": {
+            "type": "string",
+            "description": "Optional: a node id (from list_nodes) or the whole colon-path from the org root. Only workflows beneath it, at any depth, not the node itself. Omit for every workflow in your reach."
+          },
+          "query": {
+            "type": "string",
+            "description": "Optional: only rows whose address contain this text, ignoring case; at most 200 characters (longer is refused, as is text with a NUL or that is not valid UTF-8). Omit for every row."
+          },
+          "inherited_check": {
+            "type": "string",
+            "description": "Optional: an inherited check's id (from list_inherited_checks) or its whole colon-path from the org root. Only workflows in your reach with a check that inherits it, archived checks included. Omit for every workflow in your reach."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Optional: the next_cursor value from this tool's previous answer — not a cursor from a load_context, load_step or load_check trailer — sent again with the same other arguments, for the next page. Omit for the first page; never send an empty string or null. A cursor this tool did not issue for these arguments, or one older than an hour, is refused: list again without one. If your context token expires meanwhile, call load_context again and continue with the same cursor."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          }
+        },
+        "required": [
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "List Alynki workflows"
+      }
+    },
+    {
+      "name": "load_check",
+      "description": "Returns a check's criterion. In run mode (workflow, run, check, and step when the check label repeats) it returns the criterion the run was created with, with the check's review mode, maximum rejections, model and evaluation state, and the run's TRAIL: the whole record — what was consumed and what was produced — of the step this check guards and of every step before it, in the run's own step order, its own step's last. Each other check in the trail carries its criterion beside its evaluation, and each output and evaluation is followed by its reasoning, a short summary of why the agent did what it did, the reason behind the work or behind a check's verdict, not the output or the evaluation restated; a record saved before reasoning existed shows \"Not reported\". A check is a question about work that was produced, so this read carries the work and deliberately carries no governing context above it — no organisation-level context, no workflow manual, no step body. In run mode it is the packet for JUDGING the check: an agent arriving cold needs nothing else. A check that borrows its criterion shows the line \"Inherited from <path> when this run was created\". The trail is delivered once per lease: the holder of the run's lease gets it with its first load after start_run, and later loads return the criterion and one closing line saying the trail was already delivered, which is faster and uses far fewer tokens; to receive the trail again, call start_run again or call load_run. A caller that does not hold the run's lease gets the criterion alone. In template mode (node alone) it returns the template check's own criterion and no trail. Governing context is not read here: it is inherited once, with load_context at the node the workflow sits under. A step's checks are worked in order: an earlier check of the same step must be approved before this one is evaluated or decided (save_check refuses otherwise).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "check": {
+            "type": "string",
+            "description": "run mode only: the check's label within the run; send step as well when the label repeats under two steps."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Optional: continue a paginated read — echo the cursor from the previous page's trailer verbatim. Omit on the first page. Repeat the same arguments on every page of one read."
+          },
+          "node": {
+            "type": "string",
+            "description": "template mode only: a node id or the whole colon-path; a run is read with workflow, run and step"
+          },
+          "run": {
+            "type": "string",
+            "description": "run mode only: the run's label, for example PROJ-12."
+          },
+          "step": {
+            "type": "string",
+            "description": "run mode only. Optional: the label of the step the check sits under in the run. Needed only when the check label repeats under two steps of the run; a next action always carries it. Example: load_check { workflow: \"<wf id>\", run: \"PROJ-12\", step: \"build\", check: \"tests-green\" }."
+          },
+          "workflow": {
+            "type": "string",
+            "description": "run mode only: the workflow — its id or its whole colon-path from the org root."
+          }
+        },
+        "required": [
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "Load Alynki check"
+      }
+    },
+    {
+      "name": "load_context",
+      "description": "Returns the governed context for this session: the caller's scoped node and the context above it this credential is entitled to, outermost first. Call at session start, before other work — and if the result ends with the trailer '---- more context remains; call load_context with cursor: ... ----', call again with that cursor until a page arrives without it; only then is the context loaded.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "node": {
+            "type": "string",
+            "description": "Optional: the node to load instead of the credential's default scope — a node id (from list_nodes) or the whole colon-path from the org root."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Optional: to continue a paginated read, echo the cursor from the previous page's trailer verbatim. Omit on the first page."
+          }
+        },
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "Load Alynki context"
+      }
+    },
+    {
+      "name": "load_inherited_check",
+      "description": "Returns one inherited check: its criterion, its full path and updated_at, the time its criterion was last edited. Held by interactive credentials only. Anyone in the organisation can read one, whatever their access to the nodes above it. node is the check's id (from list_inherited_checks) or its whole colon-path from the org root; a node that is not an inherited check is refused with the call that reads it. Read-only; the criterion is returned whole, as stored. Needs context_token.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "context_token": {
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation.",
+            "type": "string"
+          },
+          "node": {
+            "description": "The inherited check: its node id (from list_inherited_checks) or its whole colon-path from the org root.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node",
+          "context_token"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "Load Alynki inherited check"
+      }
+    },
+    {
+      "name": "load_run",
+      "description": "Returns a whole run — every step's record, in step order: what each step consumed and produced, and under each step each check's criterion, what it found and how it was decided. Each step's output and each check's evaluation is followed by its reasoning, a short summary of why the agent did what it did, the reason behind the work or behind a check's verdict, not the output or the evaluation restated; a record saved before reasoning existed shows \"Not reported\". Read-only, and it composes no ancestor context, so ONE call is the cheap way to see a run's whole history. Use this to review or resume a run. For one step's own record with the trail of every step before it, use load_step with `run`; for a check's, load_check with `run`. Neither composes ancestor context: governing context is inherited once, with load_context at the node the workflow sits under. Its first line is the run's standing, derived by the server — the step it stands at, held, paused, terminated or complete, and the decisions counted; report from that line, never from a count of your own. A long run is answered in pages of up to 25 KiB: while a page ends with a line saying more context remains and naming a cursor, call load_run again with the same workflow and label and that cursor, until a page arrives without it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workflow": {
+            "type": "string",
+            "description": "The workflow — its id or its whole colon-path from the org root."
+          },
+          "label": {
+            "type": "string",
+            "description": "The run's label."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Optional: continue a paginated read — echo the cursor from the previous page's trailer verbatim. Omit on the first page. Repeat the same workflow and label on every page of one read."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          }
+        },
+        "required": [
+          "workflow",
+          "label",
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "Load Alynki run"
+      }
+    },
+    {
+      "name": "load_step",
+      "description": "Returns a step's text. In run mode (workflow, run, step) it returns the body the run was created with and the step's model, and the run's TRAIL: the whole record — what was consumed and what was produced — of every step at or before this one in that run, in the run's own step order, this step's own record last. Each check in the trail carries its criterion beside its evaluation, and each output and evaluation is followed by its reasoning, a short summary of why the agent did what it did, the reason behind the work or behind a check's verdict, not the output or the evaluation restated; a record saved before reasoning existed shows \"Not reported\". No ancestor composition either way (no organisation-level context, no workflow manual). In run mode this is the packet for WORKING the step: an agent arriving cold needs nothing else about the run. The trail is delivered once per lease: the holder of the run's lease gets it with its first load after start_run, and later loads return the step's body and one closing line saying the trail was already delivered, which is faster and uses far fewer tokens; to receive the trail again, call start_run again or call load_run. A caller that does not hold the run's lease gets the step's body alone. In template mode (node alone) it returns the template step's guidance and no trail. Governing context is inherited once, with load_context at the node the workflow sits under; load_context reads no step. For every step's record across a whole run, including steps after this one, use load_run.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Optional: continue a paginated read — echo the cursor from the previous page's trailer verbatim. Omit on the first page. Repeat the same arguments on every page of one read."
+          },
+          "node": {
+            "type": "string",
+            "description": "template mode only: a node id or the whole colon-path; a run is read with workflow, run and step"
+          },
+          "run": {
+            "type": "string",
+            "description": "run mode only: the run's label, for example PROJ-12."
+          },
+          "step": {
+            "type": "string",
+            "description": "run mode only: the step's label in the run, for example build. Labels are compared as text without regard to case; a label made of digits is still a label, never a position."
+          },
+          "workflow": {
+            "type": "string",
+            "description": "run mode only: the workflow — its id or its whole colon-path from the org root."
+          }
+        },
+        "required": [
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "Load Alynki step"
+      }
+    },
+    {
+      "name": "load_workflow",
+      "description": "Returns a workflow's shape: its steps in order, each with its checks in order — ids, labels, positions, each check's review_mode, max_rejections and inherits (the inherited check it borrows its criterion from, a path or null), what is archived, never bodies — and the platform's instructions for working a run of it, which arrive here and nowhere else. Call this ONCE per session, then read only what you need: a step's body with load_step and a check's with load_check (neither composes anything — cheap, and safe once this call has given you the shape). Governing context is inherited once, with load_context at the node this workflow sits under — load_context serves plain nodes and reads no workflow, step or check. For every step's record in one run, one load_run call returns them all. For checks alone without the whole shape, list_checks.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "node": {
+            "type": "string",
+            "description": "The workflow — a node id (from list_nodes or list_workflows) or the whole colon-path from the org root."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          }
+        },
+        "required": [
+          "node",
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "Load Alynki workflow"
+      }
+    },
+    {
+      "name": "move_inherited_check",
+      "description": "Moves an inherited check, with its criterion, under another plain node, in TWO CALLS. Held by interactive credentials only. The check keeps its criterion; its path changes, and everyone in the organisation can read the new path, so the labels of the new parent chain become visible to everyone. Workflow checks that inherit it keep inheriting it; runs already created keep the path they stored. First call: node and new_parent; the reply is a tool error that is the preview, giving the new path and the number of workflows that use the check, with a confirm token. It moves nothing; show it to the person. Second call: the same arguments plus confirm exactly as returned. Requires admin access on the check's current parent, on the destination, and on every ancestor left behind by the move. The destination must be a plain node. Needs context_token.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "confirm": {
+            "description": "SECOND CALL ONLY: the confirm token exactly as the first call returned it.",
+            "type": "string"
+          },
+          "context_token": {
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation.",
+            "type": "string"
+          },
+          "new_parent": {
+            "description": "The destination parent: a node id or the whole colon-path from the org root. Must be a plain node.",
+            "type": "string"
+          },
+          "node": {
+            "description": "The inherited check to move: its node id (from list_inherited_checks) or its whole colon-path from the org root.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node",
+          "new_parent",
+          "context_token"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Move Alynki inherited check"
+      }
+    },
+    {
+      "name": "move_node",
+      "description": "Moves a plain node — with its whole subtree — under a new plain node. Requires admin access on the node's current parent, on the destination, and on every ancestor left behind by the move. Grants and token scopes follow the node by id; sessions scoped inside the subtree begin inheriting the destination's chain. A workflow is moved with move_workflow; steps and checks are placed by update_workflow.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "node": {
+            "type": "string",
+            "description": "The node to move — a node id (from list_nodes) or the whole colon-path from the org root. Its whole subtree moves with it."
+          },
+          "new_parent": {
+            "type": "string",
+            "description": "The destination parent — a node id or the whole colon-path from the org root. Must be a plain node."
+          }
+        },
+        "required": [
+          "node",
+          "new_parent"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Move Alynki node"
+      }
+    },
+    {
+      "name": "move_workflow",
+      "description": "Moves a workflow — steps, checks and runs — under a new plain node. TWO CALLS. First call: send node and new_parent without confirm; the server replies with the obligations that would stop and start inheriting (the ancestors lost and gained) and a confirm token, and moves nothing. Show that preview to the user. Second call: the same arguments plus confirm. Requires admin access on the current parent, the destination, and every ancestor left behind. Plain nodes are moved with move_node.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "node": {
+            "type": "string",
+            "description": "The workflow — a node id or the whole colon-path from the org root."
+          },
+          "new_parent": {
+            "type": "string",
+            "description": "The destination — a plain node, as a node id or the whole colon-path from the org root."
+          },
+          "confirm": {
+            "type": "string",
+            "description": "SECOND CALL ONLY: the confirm token exactly as the first call returned it."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          }
+        },
+        "required": [
+          "node",
+          "new_parent",
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Move Alynki workflow"
+      }
+    },
+    {
+      "name": "release_run",
+      "description": "Releases a run that is assigned to a person, so it is open again: a controller picks it up within about 30 seconds, or a person takes it with start_run. Only the person it is assigned to, or an admin at or above the workflow, can release it. If the live lease is held by your credential, the release ends it, and so does it for any other session of yours that shares the credential; if another credential holds it, the call is refused and names it. One call, no preview. Ending a lease another credential holds (Release anyway) is done in the app.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workflow": {
+            "type": "string",
+            "description": "The workflow — a node id or the whole colon-path from the org root."
+          },
+          "label": {
+            "type": "string",
+            "description": "The run's label."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          }
+        },
+        "required": [
+          "workflow",
+          "label",
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Release Alynki run"
+      }
+    },
+    {
+      "name": "revoke_principal",
+      "description": "Removes one person's access — by email — at a node or workflow and everything beneath it, or, without node, everywhere you may remove it. TWO CALLS. First call: send email, and node if any, without confirm; the reply is a tool error that is the preview, with each of that person's sign-ins, every grant that would be removed, every grant kept because it is beyond your authority, the agents that would stop working and be marked revoked (never deleted), and whether the person is emailed, plus a confirm token, and removes nothing. Show that preview to the user. Second call: the same arguments plus confirm. Needs admin; an admin grant is removed only by an admin above it. You cannot change your own access.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The person's email — every sign-in of this organisation with that address changes together."
+          },
+          "node": {
+            "type": "string",
+            "description": "Optional: the node or workflow — a node id (from list_nodes) or the whole colon-path from the org root. Omit to revoke everything you may remove."
+          },
+          "confirm": {
+            "type": "string",
+            "description": "SECOND CALL ONLY: the confirm token exactly as the first call returned it."
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false,
+        "title": "Revoke Alynki access"
+      }
+    },
+    {
+      "name": "revoke_principal_agent",
+      "description": "Revokes an agent: every controller linked to it loses its credential at once and the sessions they launched stop, and the agent is kept, marked revoked, so the runs it worked still show who did what. TWO CALLS: first send label (and email, for someone else's agent); the reply is a tool error that is the preview, with the agent and a confirm token. Show it to the person, then send the same plus confirm. Your own agents, or, as an admin, agents whose default node is at or beneath a node you administer. A revoked agent cannot be restored; create a new one.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "The agent's label."
+          },
+          "email": {
+            "type": "string",
+            "description": "Optional: the owner's email, for another person's agent. Omit for your own."
+          },
+          "confirm": {
+            "type": "string",
+            "description": "SECOND CALL ONLY: the confirm token exactly as the first call returned it."
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Revoke Alynki agent"
+      }
+    },
+    {
+      "name": "revoke_principal_invite",
+      "description": "Withdraws a pending invitation at one node or workflow: the invited person's access there is removed and, if they are invited nowhere else, their link stops working. TWO CALLS. First call: send email and node without confirm; the reply is a tool error that is the preview, with the invitation that would be withdrawn and whether the link stops working, plus a confirm token, and changes nothing. Show that preview to the user. Second call: the same arguments plus confirm. Needs admin, as removing that access would. No email is sent. A person who has set up their account is removed with revoke_principal instead.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The invited person's email."
+          },
+          "node": {
+            "type": "string",
+            "description": "The node or workflow they were invited onto — a node id (from list_nodes) or the whole colon-path from the org root."
+          },
+          "confirm": {
+            "type": "string",
+            "description": "SECOND CALL ONLY: the confirm token exactly as the first call returned it."
+          }
+        },
+        "required": [
+          "email",
+          "node"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Revoke Alynki invitation"
+      }
+    },
+    {
+      "name": "save_check",
+      "description": "Records a check's evaluation — what you found against its criterion, as a précis with links to the evidence — and, for an autonomous check, its decision in the same call: approved true or false. It writes the evaluation only (output, reasoning and approved); it never writes a body or a criterion. Every evaluation needs a reasoning sent in the same call, a human check's included, or nothing is saved: a short summary of why you reached your verdict (approved or rejected) and your evaluation, not the evaluation restated or shortened; one plain paragraph of 10 to 80 words, at most 100; a decision alone needs none. Good: The criterion asks for a test that fails without the change; the new test failed on the old code, so I approved. Bad: Approved because all tests pass (it restates the evaluation). A human check takes output only, never approved: a person decides it in the app, and writing its evaluation hands the run to them. A rejected check is not approved again until the step is redone with save_run; there is no override. Checks of a step go in order, and a decision needs an evaluation. label is the run's label; step and check are labels in the run, as the next action gives them, and step is needed only when the check label repeats under two steps. Pass lease_id from start_run and context_token. The result is the next action — call it verbatim — or a stop; on a stop, end the session.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workflow": {
+            "type": "string",
+            "description": "The workflow — its id or its whole colon-path from the org root."
+          },
+          "label": {
+            "type": "string",
+            "description": "The run's label."
+          },
+          "step": {
+            "type": "string",
+            "description": "Optional: the label of the step the check sits under in the run. Needed only when the check label repeats under two steps of the run; a next action always carries it. Example: save_check { workflow: \"<wf id>\", label: \"PROJ-12\", step: \"build\", check: \"tests-green\" }."
+          },
+          "check": {
+            "type": "string",
+            "description": "the check's label within the run; send step as well when the label repeats under two steps"
+          },
+          "output": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What the evaluation found, as markdown. Omit to leave unchanged; null to clear."
+          },
+          "approved": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "true approves, false rejects, null withdraws the decision and returns the check to pending. Omit to leave unchanged."
+          },
+          "reasoning": {
+            "type": "string",
+            "description": "A short summary of why you did what you did: the reason behind your verdict (approved or rejected) and your evaluation. It is not the evaluation restated, and not a shorter copy of it; it explains the evaluation, it does not repeat it. Required whenever output is sent, a human check included, otherwise nothing is saved. One plain paragraph of 10 to 80 words, at most 100: no lists, no markdown, no secrets. Omit it when you send only approved. Good: The criterion asks for a test that fails without the change; the new test failed on the old code, so I approved. Bad: Approved because all tests pass (it restates the evaluation)."
+          },
+          "lease_id": {
+            "type": "string",
+            "description": "The lease start_run returned for this run. Required once the run has ever been leased."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          }
+        },
+        "required": [
+          "workflow",
+          "label",
+          "check",
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Save Alynki check decision"
+      }
+    },
+    {
+      "name": "save_context",
+      "description": "Writes a node's body, replacing it in full: the governing context at a plain node, a step's guidance, or a check's criterion. Write a précis in markdown and link out to the work — issues, pull requests, commits, files at a commit, pages — as markdown links; never paste the artifact itself. Without node it writes your default scope; with node (a node id or whole colon-path) that node. A body over about 25 KB goes in chunks: mode 'stage' with first true opens a draft and returns a draft token, further 'stage' calls append with that token, and mode 'commit' with total_chunks publishes it; never mix modes in one save. This is not for runs: a step's input and output are saved with save_run, a check's evaluation with save_check.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "The body (whole node in mode replace, or one chunk in mode stage/commit), as markdown."
+          },
+          "node": {
+            "type": "string",
+            "description": "Optional: the node to save instead of the credential's default scope — a node id (from list_nodes) or the whole colon-path from the org root."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "replace",
+              "stage",
+              "commit"
+            ],
+            "description": "replace (default): save content as the whole body. stage: append content as a chunk to a draft — use when the body is too large for one call. commit: append the final chunk and publish. Never mix modes within one save."
+          },
+          "first": {
+            "type": "boolean",
+            "description": "stage only: true on the opening chunk. Opens a fresh draft (discarding any stale one) and the result returns a draft token."
+          },
+          "draft": {
+            "type": "string",
+            "description": "stage/commit: the opaque draft token from the opening stage. Echo it verbatim on every following stage and on the commit."
+          },
+          "total_chunks": {
+            "type": "integer",
+            "description": "commit only: the total number of chunks you sent (including the commit's). The server refuses if it disagrees."
+          },
+          "total_bytes": {
+            "type": "integer",
+            "description": "commit only, optional: the total byte length of the assembled body, for integrity verification."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page. Required only when the scope being saved is a workflow, step or check — never at a plain node; if it turns out to be required and is missing, expired or out of scope, the save is refused with its own error naming the exact load_context call to make."
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Save Alynki context"
+      }
+    },
+    {
+      "name": "save_run",
+      "description": "Records what one step of a run consumed (input) and produced (output). Every output needs a reasoning sent in the same call, or nothing is saved: a short summary of why you did what you did, the reason behind the work, not the output restated or shortened; one plain paragraph of 10 to 80 words, at most 100; send a new one when you rewrite an output; input alone needs none. Good: The ticket names one flow, so I changed only that handler. Bad: I changed the handler and added a test (it restates the output). Write each as a précis in markdown with links out to the work — issues, pull requests and their commits, CI and deploy runs, files at a commit — never the artifact, a verdict or a status. Save input first (it also renews your lease on long work), then output; each is replaced whole, at most 1 MiB. Rewriting a step clears its checks' decisions and they are judged again from the first. Pass lease_id from start_run and context_token. label is the run's label and step is the step's label in the run, as the next action gives them. The result is the next action — call it verbatim — or a stop; a check's evaluation is saved with save_check, not here. Refused while an earlier step's check is not approved; the refusal names it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workflow": {
+            "type": "string",
+            "description": "The workflow — its id or its whole colon-path from the org root."
+          },
+          "label": {
+            "type": "string",
+            "description": "The run's label."
+          },
+          "step": {
+            "type": "string",
+            "description": "The step's label in the run, for example build, as the next action gives it. Labels are compared as text without regard to case; a label made of digits is still a label, never a position."
+          },
+          "input": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What the step consumed, as markdown. Omit to leave unchanged; null to clear."
+          },
+          "output": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What the step produced, as markdown. Omit to leave unchanged; null to clear."
+          },
+          "reasoning": {
+            "type": "string",
+            "description": "A short summary of why you did what you did: the reason behind the work done for this step. It is not the output restated, and not a shorter copy of it; it explains the output, it does not repeat it. Required whenever output is sent, otherwise nothing is saved. One plain paragraph of 10 to 80 words, at most 100: no lists, no markdown, no secrets. Omit it when you send only input. Good: The ticket names one flow, so I changed only that handler. Bad: I changed the handler and added a test (it restates the output)."
+          },
+          "lease_id": {
+            "type": "string",
+            "description": "The lease start_run returned for this run. Required once the run has ever been leased."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          }
+        },
+        "required": [
+          "workflow",
+          "label",
+          "step",
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Save Alynki run record"
+      }
+    },
+    {
+      "name": "set_default_context",
+      "description": "Changes where this credential's no-argument load_context and save_context resolve, to the named plain node (a node id or the whole colon-path from the org root). Use it only when the person asks to change their default scope; to read or write another node once, pass node to load_context or save_context instead. It changes only the token presenting this call; with for_every_new_session true it also sets where the person's future sessions start. A workflow, step or check is refused.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "node": {
+            "type": "string",
+            "description": "The node to make this token's default scope — a node id (from list_nodes) or the whole colon-path from the org root."
+          },
+          "for_every_new_session": {
+            "type": "boolean",
+            "description": "Optional: true also makes this node where every interactive session issued from now on starts — the person-level default. No other existing credential moves. Default false: this credential alone."
+          }
+        },
+        "required": [
+          "node"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Set default Alynki context"
+      }
+    },
+    {
+      "name": "start_run",
+      "description": "Takes the lease on one existing run so this session may record its work: call it after load_context (pass its context_token) and before any save_run or save_check. label is the run's label. Returns lease_id, which every save needs; the working instructions, once per lease — read them; and the first next action. Then follow each next action exactly as returned — its tool and arguments are callable verbatim — until a stop. assign_to_me, for a person's session only, keeps an open run for you: it is assigned to you, and no controller picks it up until you give it back. Refused when another agent holds the run, when it is assigned to someone else, when it is a person's turn or held at a limit, when it is paused or terminated, when its workflow is blocked (disabled, or suspended by a retired model or a revoked connection), or when it is complete; the refusal says what to do. It does not create a run that does not already exist.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workflow": {
+            "type": "string",
+            "description": "The workflow — its id or its whole colon-path from the org root."
+          },
+          "label": {
+            "type": "string",
+            "description": "The run's label."
+          },
+          "assign_to_me": {
+            "type": "boolean",
+            "description": "Optional, default false, a person's session only: keep this open run for you. An agent's session cannot keep one."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          }
+        },
+        "required": [
+          "workflow",
+          "label",
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Start Alynki run"
+      }
+    },
+    {
+      "name": "update_node",
+      "description": "Renames a node — any kind: plain node, workflow, step, check or inherited check. Authorised by write access on the node itself or on any node above it. The node keeps its id and its kind, so grants, token scopes, run records and pick-by-id survive; typed colon-paths through the old label stop resolving. A rename never reaches a run that already exists: each run keeps the labels it was created with. When the node is a plain node with inherited checks beneath it, the result says how many, because everyone in the organisation sees their path change.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "node": {
+            "type": "string",
+            "description": "The node to rename — a node id (from list_nodes) or the whole colon-path from the org root."
+          },
+          "label": {
+            "type": "string",
+            "description": "The new label."
+          }
+        },
+        "required": [
+          "node",
+          "label"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Rename Alynki node"
+      }
+    },
+    {
+      "name": "update_principal_agent",
+      "description": "Changes your own agent's name, its expiry, or both. label is the agent's current label; new_label renames it; expires_in_days is days from now (1 to 36500), null for never, omitted keeps it. A new expiry counts from now, never from the old date, and the result states it. One call, no preview. Linking an agent to a controller is done in the app. A revoked agent cannot be changed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "The agent's current label."
+          },
+          "new_label": {
+            "type": "string",
+            "description": "Optional: the agent's new label — 1 to 64 letters, digits, dots, hyphens or underscores, starting and ending with a letter or digit; unique among your agents."
+          },
+          "expires_in_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Optional: days from now the agent expires, a whole number from 1 to 36500; null for never; omit to keep the expiry."
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Update Alynki agent"
+      }
+    },
+    {
+      "name": "update_workflow",
+      "description": "Declares a workflow's WHOLE new shape — every step and its checks, in order, not a delta — in TWO CALLS. First call: node and shape (plus disabled if you are enabling or disabling it), with context_token; the reply is a tool error that is the preview, with the diff and a confirm token. Show it to the person, then send the same arguments plus confirm. Items are matched by label. An item left out is removed with its body, even when runs used it, unless a grant or an agent is anchored on it or it is a trigger with run records (refused). Removing a step or check changes no run already created, because each run keeps its own copy. Archiving a step or check changes no run already created either; it leaves the item out of the runs created afterwards. Change review_mode or max_rejections (1-10; null resets to 3) in the shape. A check that borrows its criterion carries inherits: the whole colon-path of an inherited check (list_inherited_checks lists them), a path and never an id or a body, sent on every call that keeps the check; another path re-points the check for the runs created afterwards. To make an existing check inherit, leave it out of the shape in one call and add a new check that carries inherits in the next. The owners of the inherited check will see this workflow's path. Triggers and steps are numbered in one order by position, the start trigger being 1; this is the number the app shows. Two triggers never sit in a row and the last item is never a trigger: a step must sit between two triggers and follow the last one, judged in the order written: a trigger with no position takes its place in the array, between the items written either side of it. disabled true stops new runs, and is how a workflow whose runs are kept is retired. Rename with update_node; new items start empty — write each with save_context, except a check that inherits, which borrows its criterion.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "node": {
+            "type": "string",
+            "description": "The workflow — a node id or the whole colon-path from the org root."
+          },
+          "shape": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 64,
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "step": {
+                      "type": "string"
+                    },
+                    "archived": {
+                      "type": "boolean",
+                      "description": "true archives the step; omit (or false) to keep it active or restore it."
+                    },
+                    "model": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Optional: the model version this action runs on, such as claude-sonnet-5-5, taken from the catalogue the app lists. Omit to keep the current value (update_workflow) or to name none (create); null clears it. None means the controller's default model."
+                    },
+                    "checks": {
+                      "type": "array",
+                      "maxItems": 16,
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "label": {
+                                "type": "string"
+                              },
+                              "review_mode": {
+                                "type": "string",
+                                "enum": [
+                                  "autonomous",
+                                  "human"
+                                ],
+                                "description": "Default autonomous."
+                              },
+                              "archived": {
+                                "type": "boolean",
+                                "description": "true archives the check; omit (or false) to keep it active or restore it. An archived check is left out of every run created from then on; a run ignores archived once it is created."
+                              },
+                              "max_rejections": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ],
+                                "description": "An agent's rejection limit on this check, 1-10. Omit to keep the current value (update_workflow) or take the default 3 (create); null resets it to 3."
+                              },
+                              "model": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "description": "Optional: the model version this action runs on, such as claude-sonnet-5-5, taken from the catalogue the app lists. Omit to keep the current value (update_workflow) or to name none (create); null clears it. None means the controller's default model. A human check names none."
+                              },
+                              "inherits": {
+                                "type": "string",
+                                "description": "The whole colon-path of an inherited check. Path only. Required on every check that inherits, in create_workflow and update_workflow."
+                              }
+                            },
+                            "required": [
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "description": "The step's checks in order — each a label (review_mode autonomous, active), or an object {label, review_mode, archived, max_rejections, model, inherits}."
+                    }
+                  },
+                  "required": [
+                    "step"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "trigger": {
+                      "type": "string",
+                      "description": "The trigger's label."
+                    },
+                    "position": {
+                      "type": "integer",
+                      "description": "Optional: a sort key, not the number the app shows (steps are stored at 1000, 2000, 3000). 0 is this workflow's start trigger (at most one); a step and a trigger never share a position. Omitted: the trigger takes its place in this array, between the items written either side of it."
+                    },
+                    "connection": {
+                      "type": "string",
+                      "description": "Optional: the id of a connection on this workflow's node or above it (list_connections with workflow). Omitted: a schedule trigger, judged on check_every/its own RRULE config instead."
+                    },
+                    "config": {
+                      "type": "object",
+                      "description": "The trigger's config, by kind. No connection (schedule), all required: rrule, time (HH:MM), timezone (IANA), business_days (array of weekday codes, e.g. [\"MO\",\"TU\",\"WE\",\"TH\",\"FR\"]); optional: start_date, end_date. connection mcp: tool, arguments, items_pointer, id_field, timestamp_field. imap: folder. graph_drive/gdrive/storage: subfolder. command: args. http: none beyond the connection."
+                    },
+                    "filter": {
+                      "type": "string",
+                      "description": "Optional: a CEL expression over item (and, at a position after 0, trail). Mutually exclusive with filter_rows."
+                    },
+                    "filter_rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "field": {
+                            "type": "string"
+                          },
+                          "op": {
+                            "type": "string"
+                          },
+                          "value": {}
+                        },
+                        "required": [
+                          "field",
+                          "op",
+                          "value"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Optional: [{field, op, value}] rows — a simple alternative to filter for a plain conjunction of comparisons. Mutually exclusive with filter. A row compares a scalar field; the sender's address is fromAddress, toAddress and ccAddress are the same for recipients. A list field such as from, to or cc cannot be compared by a row: use filter, an expression, for it."
+                    },
+                    "check_every": {
+                      "type": "integer",
+                      "description": "Seconds, 10-86400. Required with connection; omitted for a schedule, which fires at its own times."
+                    },
+                    "archived": {
+                      "type": "boolean",
+                      "description": "Optional: true creates the trigger archived. Default false."
+                    }
+                  },
+                  "required": [
+                    "trigger",
+                    "config"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "description": "The WHOLE new shape, in order. Existing steps, checks and triggers are matched by label, case-insensitively; a trigger item carries \"trigger\" instead of \"step\". A trigger left out is removed the same as a step; omitting position on a matched trigger keeps it where it is."
+          },
+          "disabled": {
+            "type": "boolean",
+            "description": "Optional: true disables the workflow (no new runs; runs in motion finish their current action, then wait), false enables it, and a workflow with a retired model or a revoked connection stays suspended. Omit to leave it as it is."
+          },
+          "confirm": {
+            "type": "string",
+            "description": "SECOND CALL ONLY: the confirm token exactly as the first call returned it."
+          },
+          "context_token": {
+            "type": "string",
+            "description": "The token load_context returned on its LAST page (it pages to completion before issuing one). It is valid for the node it was loaded at and everything under it. Required; a missing or expired token is refused naming the load_context call to make, an out-of-scope one naming the node it covers, not a schema violation."
+          }
+        },
+        "required": [
+          "node",
+          "shape",
+          "context_token"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Update Alynki workflow"
+      }
+    }
+  ]
+}

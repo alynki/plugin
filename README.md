@@ -362,8 +362,11 @@ app package: a declarative agent whose API plugin names the server and an OAuth 
 registration. `copilot/` holds that package's sources: the Teams app manifest (1.19), the
 declarative agent (v1.6) and the API plugin (v2.4), whose runtime is a `RemoteMCPServer` at
 `https://mcp.alynki.com/mcp` with `OAuthPluginVault` auth, plus `color.png` (192x192) and
-`outline.png` (32x32). The plugin lists no tool: with `functions` empty and `run_for_functions`
-`["*"]`, Copilot discovers the server's tools at run time. The agent's instructions say to call
+`outline.png` (32x32). The plugin pins its 44 tools: `functions` and `run_for_functions` name them and
+`mcp-tools.json` holds their definitions, because Copilot's dynamic discovery calls `tools/list` before
+sign-in, `mcp.alynki.com` answers it with 401, and so no tool appears and nothing prompts the sign-in.
+`copilot/gen-tools.sh <token-file>` regenerates `mcp-tools.json` from the live server with an interactive
+token read from a file, and refuses if the server's tools differ from the plugin's tool list. The agent's instructions say to call
 `load_context` first, paged to completion, as the other clients do.
 
 The registration ID is not in the repository. Register the OAuth client in the Teams Developer
@@ -375,7 +378,7 @@ copilot/build.sh <registration-id> [out.zip]   # default: copilot/alynki-copilot
 
 The script refuses an empty or placeholder ID, writes the ID into the plugin's `reference_id`
 (a placeholder in `copilot/alynki-plugin.json`, not an environment variable), checks the JSON and the icon
-sizes, and writes the five files at the root of the zip. It needs `jq` and `zip`.
+sizes, and writes `mcp-tools.json` and the other five files at the root of the zip. It needs `jq` and `zip`.
 
 Until a store listing exists, a customer's Microsoft 365 admin installs the zip:
 
