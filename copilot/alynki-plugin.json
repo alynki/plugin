@@ -8,7 +8,140 @@
   "contact_email": "info@alynki.com",
   "legal_info_url": "https://alynki.com/terms/",
   "privacy_policy_url": "https://alynki.com/privacy/",
-  "functions": [],
+  "functions": [
+    {
+      "name": "create_check"
+    },
+    {
+      "name": "create_inherited_check"
+    },
+    {
+      "name": "create_node"
+    },
+    {
+      "name": "create_principal_agent"
+    },
+    {
+      "name": "create_run"
+    },
+    {
+      "name": "create_step"
+    },
+    {
+      "name": "create_trigger"
+    },
+    {
+      "name": "create_workflow"
+    },
+    {
+      "name": "delete_inherited_check"
+    },
+    {
+      "name": "delete_node"
+    },
+    {
+      "name": "delete_run"
+    },
+    {
+      "name": "delete_workflow"
+    },
+    {
+      "name": "grant_principal"
+    },
+    {
+      "name": "invite_principal"
+    },
+    {
+      "name": "list_checks"
+    },
+    {
+      "name": "list_connections"
+    },
+    {
+      "name": "list_inherited_checks"
+    },
+    {
+      "name": "list_nodes"
+    },
+    {
+      "name": "list_pending_checks"
+    },
+    {
+      "name": "list_principal_agents"
+    },
+    {
+      "name": "list_principals"
+    },
+    {
+      "name": "list_runs"
+    },
+    {
+      "name": "list_workflows"
+    },
+    {
+      "name": "load_check"
+    },
+    {
+      "name": "load_context"
+    },
+    {
+      "name": "load_inherited_check"
+    },
+    {
+      "name": "load_run"
+    },
+    {
+      "name": "load_step"
+    },
+    {
+      "name": "load_workflow"
+    },
+    {
+      "name": "move_inherited_check"
+    },
+    {
+      "name": "move_node"
+    },
+    {
+      "name": "move_workflow"
+    },
+    {
+      "name": "release_run"
+    },
+    {
+      "name": "revoke_principal"
+    },
+    {
+      "name": "revoke_principal_agent"
+    },
+    {
+      "name": "revoke_principal_invite"
+    },
+    {
+      "name": "save_check"
+    },
+    {
+      "name": "save_context"
+    },
+    {
+      "name": "save_run"
+    },
+    {
+      "name": "set_default_context"
+    },
+    {
+      "name": "start_run"
+    },
+    {
+      "name": "update_node"
+    },
+    {
+      "name": "update_principal_agent"
+    },
+    {
+      "name": "update_workflow"
+    }
+  ],
   "runtimes": [
     {
       "type": "RemoteMCPServer",
@@ -17,9 +150,57 @@
         "reference_id": "${ALYNKI_COPILOT_REGISTRATION_ID}"
       },
       "spec": {
-        "url": "https://mcp.alynki.com/mcp"
+        "url": "https://mcp.alynki.com/mcp",
+        "mcp_tool_description": {
+          "file": "mcp-tools.json"
+        }
       },
-      "run_for_functions": ["*"]
+      "run_for_functions": [
+        "create_check",
+        "create_inherited_check",
+        "create_node",
+        "create_principal_agent",
+        "create_run",
+        "create_step",
+        "create_trigger",
+        "create_workflow",
+        "delete_inherited_check",
+        "delete_node",
+        "delete_run",
+        "delete_workflow",
+        "grant_principal",
+        "invite_principal",
+        "list_checks",
+        "list_connections",
+        "list_inherited_checks",
+        "list_nodes",
+        "list_pending_checks",
+        "list_principal_agents",
+        "list_principals",
+        "list_runs",
+        "list_workflows",
+        "load_check",
+        "load_context",
+        "load_inherited_check",
+        "load_run",
+        "load_step",
+        "load_workflow",
+        "move_inherited_check",
+        "move_node",
+        "move_workflow",
+        "release_run",
+        "revoke_principal",
+        "revoke_principal_agent",
+        "revoke_principal_invite",
+        "save_check",
+        "save_context",
+        "save_run",
+        "set_default_context",
+        "start_run",
+        "update_node",
+        "update_principal_agent",
+        "update_workflow"
+      ]
     }
   ],
   "capabilities": {
