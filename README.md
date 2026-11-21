@@ -320,8 +320,8 @@ including the one setting held in `settings.json` (*What it runs, sends and fetc
   `alynki-plugin/tools.txt`, writes an exact-name ask rule for each of the seven in `alynki-plugin/ask-tools.txt`,
   and removes the allow rules 0.29 wrote for them. `setup-antigravity.sh` removes them too. Re-run the setup on a
   machine set up by 0.29. No tool and no prompt added: 44 tools and 44 prompts. Also in 0.30.0: the Microsoft 365 Copilot
-  agent package 1.0.8 gives each function its tool's description, which the admin centre requires
-  (`copilot/gen-tools.sh` writes them), and the Codex section names `hooks/codex-hooks.json` and the one-time hook trust.
+  agent package 1.0.9 gives each function its tool's description, which the admin centre requires
+  (`copilot/gen-tools.sh` writes them) and opens with a "Connect to Alynki" starter, since Copilot calls no tool again in the chat where the person signed in; the Codex section names `hooks/codex-hooks.json` and the one-time hook trust.
 - `alynki` 0.29.1: Codex now receives the load-first instruction. Codex ran the hook but dropped its output,
   because the Claude `SessionStart` shape carries `initialUserMessage`, which Codex does not accept; the Codex
   manifest now names `hooks/codex-hooks.json`, whose `codex` shape prints `additionalContext` only. Claude Code's
@@ -399,6 +399,8 @@ Until a store listing exists, a customer's Microsoft 365 admin installs the zip:
 
 The agent then appears in each chosen person's Copilot. The first time it calls a tool, Copilot
 asks the person to sign in to Alynki.
+The first chat only connects: after the sign-in the agent says "Alynki is connected", and questions
+go in a new chat (a Copilot limitation: it calls no tool again in the chat where the person signed in).
 
 ## Status
 
