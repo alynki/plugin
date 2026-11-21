@@ -259,6 +259,31 @@ ok "session-start.sh refuses an unknown shape" unknown_shape_refused
 ok "no Grok hook ships (Grok Build session hooks cannot inject)" no_grok_hook
 ok "both READMEs cover Codex CLI, Antigravity CLI, load_context and hand installs" readmes_cover_the_clients
 
+# Codex gets its own hook file (alynki/alynki#3442): Codex drops a SessionStart output carrying initialUserMessage.
+CODEXHOOKS=alynki-plugin/hooks/codex-hooks.json
+codex_manifest_names_its_hooks() { [ "$(jq -r .hooks "$CODEX")" = "./hooks/codex-hooks.json" ] && [ -s "$CODEXHOOKS" ]; }
+# shellcheck disable=SC2016 # ${PLUGIN_ROOT} is literal text in the hook command
+codex_hook_commands_use_the_codex_shape() {
+  [ "$(jq -r '.hooks.SessionStart[0].hooks[0].command' "$CODEXHOOKS")" = 'sh "${PLUGIN_ROOT}"/hooks/session-start.sh codex session' ] &&
+    [ "$(jq -r '.hooks.SubagentStart[0].hooks[0].command' "$CODEXHOOKS")" = 'sh "${PLUGIN_ROOT}"/hooks/session-start.sh codex subagent' ] &&
+    [ "$(jq -r '[.hooks[][].hooks[].command] | length' "$CODEXHOOKS")" -eq 2 ]
+}
+codex_session_output_is_additional_context_only() {
+  sh alynki-plugin/hooks/session-start.sh codex session </dev/null |
+    jq -e --rawfile w alynki-plugin/hooks/load-first.md '(.hookSpecificOutput | keys) == ["additionalContext", "hookEventName"] and .hookSpecificOutput.hookEventName == "SessionStart" and .hookSpecificOutput.additionalContext + "\n" == $w' >/dev/null
+}
+codex_hook_commands_print_the_output() {
+  local d out
+  d=$PWD/alynki-plugin
+  out=$(PLUGIN_ROOT=$d sh -c "$(jq -r '.hooks.SessionStart[0].hooks[0].command' "$CODEXHOOKS")" </dev/null) && [ "$out" = "$(sh alynki-plugin/hooks/session-start.sh codex session </dev/null)" ] &&
+    out=$(PLUGIN_ROOT=$d sh -c "$(jq -r '.hooks.SubagentStart[0].hooks[0].command' "$CODEXHOOKS")" </dev/null) && [ "$out" = "$(claude_output subagent)" ]
+}
+ok "the standard plugin's version is at least 0.29.1, the release of the Codex hook file" version_at_least "$STD" 0.29.1
+ok "the Codex manifest names hooks/codex-hooks.json, which exists" codex_manifest_names_its_hooks
+ok "codex-hooks.json runs session-start.sh codex for SessionStart and SubagentStart, from PLUGIN_ROOT" codex_hook_commands_use_the_codex_shape
+ok "session-start.sh codex prints SessionStart with the wording as additionalContext and no other field" codex_session_output_is_additional_context_only
+ok "the Codex hook commands print the script's output (a real run with PLUGIN_ROOT set)" codex_hook_commands_print_the_output
+
 readmes_cover_copilot() {
   local f
   for f in README.md "$PLUGIN_README"; do
@@ -372,8 +397,18 @@ copilot_runtime_url() {
 copilot_auth_is_the_vault() {
   [ "$(jq -r '.runtimes[0].auth.type' "$CP_PLUGIN")" = OAuthPluginVault ] && [ "$(jq -r '.runtimes[0].auth.reference_id' "$CP_PLUGIN")" = "$CP_PLACEHOLDER" ]
 }
-copilot_tools_are_discovered() {
-  [ "$(jq -c .functions "$CP_PLUGIN")" = '[]' ] && [ "$(jq -c '.runtimes[0].run_for_functions' "$CP_PLUGIN")" = '["*"]' ] && [ "$(jq -r '.runtimes[0].spec | has("mcp_tool_description")' "$CP_PLUGIN")" = false ]
+# The tools are pinned (alynki/alynki#3453): mcp.alynki.com answers tools/list with 401 before sign-in, so Copilot's
+# dynamic discovery finds none and nothing prompts the sign-in. functions, run_for_functions and mcp-tools.json name
+# the same tools, and they are the plugin's tool list, so a tool added to the server and the list cannot be left out.
+copilot_tools_are_pinned() {
+  local f r m
+  f=$(jq -r '[.functions[].name] | sort | join(" ")' "$CP_PLUGIN") && r=$(jq -r '.runtimes[0].run_for_functions | sort | join(" ")' "$CP_PLUGIN") &&
+    m=$(jq -r '[.tools[].name] | sort | join(" ")' "$CP/mcp-tools.json") &&
+    [ -n "$f" ] && [ "$f" = "$r" ] && [ "$f" = "$m" ] && [ "$(jq -r '.runtimes[0].spec.mcp_tool_description.file' "$CP_PLUGIN")" = mcp-tools.json ] &&
+    jq -e '[.tools[] | has("name") and has("description") and has("inputSchema")] | all' "$CP/mcp-tools.json" >/dev/null
+}
+copilot_pinned_tools_are_the_tool_list() {
+  [ "$(jq -r '.tools[].name' "$CP/mcp-tools.json" | sort | tr '\n' ' ')" = "$(cat alynki-plugin/tools.txt alynki-plugin/ask-tools.txt 2>/dev/null | sort | tr '\n' ' ')" ]
 }
 copilot_instructions_name_load_context() {
   jq -e '.instructions | contains("load_context") and contains("cursor") and (length <= 8000)' "$CP/declarativeAgent.json" >/dev/null &&
@@ -399,7 +434,7 @@ build_zip_carries_the_id() {
   local d rc=0
   d=$(mktemp -d) || return 1
   "$CP/build.sh" dummy-reg-id-123 "$d/p.zip" >/dev/null 2>&1 &&
-    [ "$(unzip -Z1 "$d/p.zip" | sort | tr '\n' ' ')" = "alynki-plugin.json color.png declarativeAgent.json manifest.json outline.png " ] &&
+    [ "$(unzip -Z1 "$d/p.zip" | sort | tr '\n' ' ')" = "alynki-plugin.json color.png declarativeAgent.json manifest.json mcp-tools.json outline.png " ] &&
     [ "$(unzip -p "$d/p.zip" alynki-plugin.json | jq -r '.runtimes[0].auth.reference_id')" = dummy-reg-id-123 ] &&
     [ "$(unzip -p "$d/p.zip" manifest.json | jq -r .id)" = "$(jq -r .id "$CP/manifest.json")" ] &&
     ! unzip -p "$d/p.zip" alynki-plugin.json | grep -qF 'ALYNKI_COPILOT_REGISTRATION_ID' || rc=1
@@ -414,12 +449,13 @@ ok "the Copilot package's three JSON files parse" copilot_json_parses
 ok "the Copilot package is Teams manifest 1.19, declarative agent v1.6 and plugin v2.4, wired to each other, with a GUID id" copilot_schema_versions
 ok "the plugin's runtime is one RemoteMCPServer at https://mcp.alynki.com/mcp, the url the MCP files carry" copilot_runtime_url
 ok "the plugin's auth is OAuthPluginVault with the placeholder reference_id (the real id is never committed)" copilot_auth_is_the_vault
-ok "the plugin hand-lists no tool: functions empty, run_for_functions [\"*\"], no mcp_tool_description" copilot_tools_are_discovered
+ok "the plugin pins its tools: functions, run_for_functions and mcp-tools.json name the same tools, each with a description and inputSchema" copilot_tools_are_pinned
+ok "the pinned tools are exactly the plugin's tool list" copilot_pinned_tools_are_the_tool_list
 ok "the agent's instructions name load_context, paging to a cursor, within 8000 characters" copilot_instructions_name_load_context
 ok "the icons are color.png 192x192 and outline.png 32x32, named by the manifest" copilot_icons_have_their_sizes
 ok "the manifest carries the developer, privacy and terms URLs; the agent has three prompt starters and the same name; no em dash" copilot_listing_fields
 ok "copilot/build.sh refuses a missing, empty or placeholder registration id and writes nothing" build_refuses_missing_and_placeholder
-ok "copilot/build.sh given a dummy id writes a zip, five files at its root, whose plugin carries the id" build_zip_carries_the_id
+ok "copilot/build.sh given a dummy id writes a zip, six files at its root, whose plugin carries the id" build_zip_carries_the_id
 ok "the README has a Microsoft 365 Copilot section: the build, the admin centre install, OAuthPluginVault" readme_covers_copilot_package
 
 echo "$n assertions, $failed failed"

@@ -188,9 +188,10 @@ Key: diamond, a decision made by the server; rectangle, the surface a session is
 - `SessionStart` and `SubagentStart` hooks (Claude Code and Codex; Antigravity gets `SessionStart`) that
   instruct every session, and every subagent, to call `load_context` first. Each runs
   `hooks/session-start.sh`, which prints the one wording file `hooks/load-first.md` in the client's
-  shape (Claude Code and Codex: `SessionStart` emits both `initialUserMessage` and
-  `additionalContext`, `SubagentStart` emits `additionalContext`; Antigravity: an injected
-  `systemMessage`). The text names only `load_context`, which every credential class holds.
+  shape (Claude Code: `SessionStart` emits both `initialUserMessage` and `additionalContext`; Codex,
+  from its own `hooks/codex-hooks.json`: `SessionStart` emits `additionalContext` only, because Codex drops
+  an output carrying a field it does not know; `SubagentStart` emits `additionalContext` in both;
+  Antigravity: an injected `systemMessage`). The text names only `load_context`, which every credential class holds.
 
 ## Working a run
 
@@ -310,6 +311,10 @@ including the one setting held in `settings.json` (*What it runs, sends and fetc
 
 ## Release notes
 
+- `alynki` 0.29.1: Codex now receives the load-first instruction. Codex ran the hook but dropped its output,
+  because the Claude `SessionStart` shape carries `initialUserMessage`, which Codex does not accept; the Codex
+  manifest now names `hooks/codex-hooks.json`, whose `codex` shape prints `additionalContext` only. Claude Code's
+  hook output is unchanged. No tool and no prompt added: 44 tools and 44 prompts.
 - `alynki` 0.29.0: one plugin for every client. One wording file (`alynki-plugin/hooks/load-first.md`) and one
   script (`alynki-plugin/hooks/session-start.sh`) start each session and subagent with `load_context` in Claude Code,
   Codex CLI, Antigravity CLI, VS Code and GitHub Copilot CLI, each from its own manifest and MCP file at the one
@@ -357,8 +362,11 @@ app package: a declarative agent whose API plugin names the server and an OAuth 
 registration. `copilot/` holds that package's sources: the Teams app manifest (1.19), the
 declarative agent (v1.6) and the API plugin (v2.4), whose runtime is a `RemoteMCPServer` at
 `https://mcp.alynki.com/mcp` with `OAuthPluginVault` auth, plus `color.png` (192x192) and
-`outline.png` (32x32). The plugin lists no tool: with `functions` empty and `run_for_functions`
-`["*"]`, Copilot discovers the server's tools at run time. The agent's instructions say to call
+`outline.png` (32x32). The plugin pins its 44 tools: `functions` and `run_for_functions` name them and
+`mcp-tools.json` holds their definitions, because Copilot's dynamic discovery calls `tools/list` before
+sign-in, `mcp.alynki.com` answers it with 401, and so no tool appears and nothing prompts the sign-in.
+`copilot/gen-tools.sh <token-file>` regenerates `mcp-tools.json` from the live server with an interactive
+token read from a file, and refuses if the server's tools differ from the plugin's tool list. The agent's instructions say to call
 `load_context` first, paged to completion, as the other clients do.
 
 The registration ID is not in the repository. Register the OAuth client in the Teams Developer
@@ -370,7 +378,7 @@ copilot/build.sh <registration-id> [out.zip]   # default: copilot/alynki-copilot
 
 The script refuses an empty or placeholder ID, writes the ID into the plugin's `reference_id`
 (a placeholder in `copilot/alynki-plugin.json`, not an environment variable), checks the JSON and the icon
-sizes, and writes the five files at the root of the zip. It needs `jq` and `zip`.
+sizes, and writes `mcp-tools.json` and the other five files at the root of the zip. It needs `jq` and `zip`.
 
 Until a store listing exists, a customer's Microsoft 365 admin installs the zip:
 
