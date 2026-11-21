@@ -19,7 +19,7 @@ If your operator issued you a pinned token, put it in the plugin's **Alynki API 
 
 ## Codex CLI
 
-Codex reads this folder as it is: `.codex-plugin/plugin.json`, `mcp.json` (the same address, with a transport `type`) and the Claude `hooks/hooks.json`, which Codex accepts as it stands. Install it by hand from a clone of the repository in your Codex plugin settings, and sign in when Codex first connects. Codex runs a plugin's hooks only for a plugin installed by hand, and only after you review and trust them, so the load-first instruction does not run from the public plugin directory. A session then starts with `load_context`; without the hook, ask your agent to call `load_context` first.
+Codex reads this folder as it is: `.codex-plugin/plugin.json`, `mcp.json` (the same address, with a transport `type`) and `hooks/codex-hooks.json`, which the Codex manifest names: the same script as Claude Code's hooks, printing `additionalContext` only, because Codex drops a hook output that carries a field it does not know. Install it by hand from a clone of the repository in your Codex plugin settings, and sign in when Codex first connects. Codex runs a plugin's hooks only for a plugin installed by hand, and only after you review and trust them, so the load-first instruction does not run from the public plugin directory. A session then starts with `load_context`; without the hook, ask your agent to call `load_context` first.
 
 ## Antigravity CLI
 

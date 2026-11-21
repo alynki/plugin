@@ -259,6 +259,31 @@ ok "session-start.sh refuses an unknown shape" unknown_shape_refused
 ok "no Grok hook ships (Grok Build session hooks cannot inject)" no_grok_hook
 ok "both READMEs cover Codex CLI, Antigravity CLI, load_context and hand installs" readmes_cover_the_clients
 
+# Codex gets its own hook file (alynki/alynki#3442): Codex drops a SessionStart output carrying initialUserMessage.
+CODEXHOOKS=alynki-plugin/hooks/codex-hooks.json
+codex_manifest_names_its_hooks() { [ "$(jq -r .hooks "$CODEX")" = "./hooks/codex-hooks.json" ] && [ -s "$CODEXHOOKS" ]; }
+# shellcheck disable=SC2016 # ${PLUGIN_ROOT} is literal text in the hook command
+codex_hook_commands_use_the_codex_shape() {
+  [ "$(jq -r '.hooks.SessionStart[0].hooks[0].command' "$CODEXHOOKS")" = 'sh "${PLUGIN_ROOT}"/hooks/session-start.sh codex session' ] &&
+    [ "$(jq -r '.hooks.SubagentStart[0].hooks[0].command' "$CODEXHOOKS")" = 'sh "${PLUGIN_ROOT}"/hooks/session-start.sh codex subagent' ] &&
+    [ "$(jq -r '[.hooks[][].hooks[].command] | length' "$CODEXHOOKS")" -eq 2 ]
+}
+codex_session_output_is_additional_context_only() {
+  sh alynki-plugin/hooks/session-start.sh codex session </dev/null |
+    jq -e --rawfile w alynki-plugin/hooks/load-first.md '(.hookSpecificOutput | keys) == ["additionalContext", "hookEventName"] and .hookSpecificOutput.hookEventName == "SessionStart" and .hookSpecificOutput.additionalContext + "\n" == $w' >/dev/null
+}
+codex_hook_commands_print_the_output() {
+  local d out
+  d=$PWD/alynki-plugin
+  out=$(PLUGIN_ROOT=$d sh -c "$(jq -r '.hooks.SessionStart[0].hooks[0].command' "$CODEXHOOKS")" </dev/null) && [ "$out" = "$(sh alynki-plugin/hooks/session-start.sh codex session </dev/null)" ] &&
+    out=$(PLUGIN_ROOT=$d sh -c "$(jq -r '.hooks.SubagentStart[0].hooks[0].command' "$CODEXHOOKS")" </dev/null) && [ "$out" = "$(claude_output subagent)" ]
+}
+ok "the standard plugin's version is at least 0.29.1, the release of the Codex hook file" version_at_least "$STD" 0.29.1
+ok "the Codex manifest names hooks/codex-hooks.json, which exists" codex_manifest_names_its_hooks
+ok "codex-hooks.json runs session-start.sh codex for SessionStart and SubagentStart, from PLUGIN_ROOT" codex_hook_commands_use_the_codex_shape
+ok "session-start.sh codex prints SessionStart with the wording as additionalContext and no other field" codex_session_output_is_additional_context_only
+ok "the Codex hook commands print the script's output (a real run with PLUGIN_ROOT set)" codex_hook_commands_print_the_output
+
 readmes_cover_copilot() {
   local f
   for f in README.md "$PLUGIN_README"; do
