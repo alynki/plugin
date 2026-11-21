@@ -1,0 +1,7 @@
+grant_principal
+revoke_principal
+invite_principal
+revoke_principal_invite
+create_principal_agent
+update_principal_agent
+revoke_principal_agent

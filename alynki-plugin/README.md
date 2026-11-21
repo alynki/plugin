@@ -19,7 +19,7 @@ If your operator issued you a pinned token, put it in the plugin's **Alynki API 
 
 ## Codex CLI
 
-Codex reads this folder as it is: `.codex-plugin/plugin.json`, `mcp.json` (the same address, with a transport `type`) and `hooks/codex-hooks.json`, which the Codex manifest names: the same script as Claude Code's hooks, printing `additionalContext` only, because Codex drops a hook output that carries a field it does not know. Install it by hand from a clone of the repository in your Codex plugin settings, and sign in when Codex first connects. Codex runs a plugin's hooks only for a plugin installed by hand, and only after you review and trust them, so the load-first instruction does not run from the public plugin directory. A session then starts with `load_context`; without the hook, ask your agent to call `load_context` first.
+Codex reads this folder as it is: `.codex-plugin/plugin.json`, `mcp.json` (the same address, with a transport `type`) and `hooks/codex-hooks.json`, which the Codex manifest names: the same script as Claude Code's hooks, printing `additionalContext` only, because Codex drops a hook output that carries a field it does not know. Install it with `codex plugin marketplace add alynki/plugin` and `codex plugin add alynki@alynki-marketplace`, and sign in when Codex first connects. Codex runs a plugin's hooks only after you review and trust them once in Codex, so the load-first instruction does not run from the public plugin directory. A session then starts with `load_context`; without the hook, ask your agent to call `load_context` first.
 
 ## Antigravity CLI
 
@@ -49,7 +49,7 @@ Grok Build has no hook that can inject text into a session, so this plugin ships
 ## Setup per client
 
 - **Claude Code:** run `/alynki:setup` once.
-- **Antigravity CLI:** run `sh bin/setup-antigravity.sh` (needs `jq`). It adds `mcp(alynki/<tool>)` rules for the tools in `tools.txt` to `permissions.allow` in `~/.gemini/antigravity-cli/settings.json`, keeps your other entries, and changes nothing on a second run.
+- **Antigravity CLI:** run `sh bin/setup-antigravity.sh` (needs `jq`). It adds `mcp(alynki/<tool>)` rules for the 37 tools in `tools.txt` to `permissions.allow` in `~/.gemini/antigravity-cli/settings.json`, removes any allow rule for the seven access-changing tools in `ask-tools.txt` so Antigravity asks before each, keeps your other entries, and changes nothing on a second run.
 - **Other clients:** no local permission file; see https://alynki.com/docs/.
 
 ## What you can ask
@@ -62,7 +62,7 @@ Claude Code runs three things from this plugin, and nothing else (Codex and Anti
 
 - **Two hooks**, `SessionStart` and `SubagentStart`. Each runs `sh "${CLAUDE_PLUGIN_ROOT}"/hooks/session-start.sh claude <session|subagent>`, which prints the fixed text in `hooks/load-first.md` and tells the session, and every subagent it starts, to call `load_context` first. The text applies even when the user's message asks the model not to use tools, and it says the model may tell the user it loaded the context. The hooks make no network call and read nothing else.
 - **A header helper**, `bin/headers.sh`, which Claude Code runs when it connects, reconnects or meets a 401 or 403 from Alynki. It needs `jq`, reads only the `alynki` entry under `pluginConfigs` in `$CLAUDE_CONFIG_DIR/settings.json` (`~/.claude/settings.json` when that is unset), and prints a JSON object of headers: `Authorization: Bearer <token>` when a pinned token is set, and `X-Alynki-Model: <model>` when the optional model setting is a plain model id. It writes nothing, makes no network call and never prints the model.
-- **A setup skill**, `/alynki:setup`, which runs only when you invoke it. It shows you an edit to `~/.claude/settings.json` that allows each of Alynki's 44 tools (listed in `tools.txt`) without a prompt, and applies the edit once you agree.
+- **A setup skill**, `/alynki:setup`, which runs only when you invoke it. It shows you an edit to `~/.claude/settings.json` that allows 37 of Alynki's tools (listed in `tools.txt`) without a prompt and makes the seven that change who has access (listed in `ask-tools.txt`) ask you before each call, and applies the edit once you agree.
 
 It sends your requests, over HTTPS, only to `https://mcp.alynki.com/mcp`, and signs you in at `https://auth.alynki.com` through Claude Code's OAuth flow in your browser. It fetches only what that server returns for your account. It sends no analytics and contacts no other host.
 

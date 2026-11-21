@@ -13,6 +13,7 @@ cd "$(dirname "$0")/.." || exit 1
 SKILL=alynki-plugin/skills/setup/SKILL.md
 STD=alynki-plugin/.claude-plugin/plugin.json
 LIST=alynki-plugin/tools.txt
+ASKLIST=alynki-plugin/ask-tools.txt
 AGYSET=alynki-plugin/bin/setup-antigravity.sh
 
 n=0
@@ -244,7 +245,7 @@ no_grok_hook() { [ ! -e alynki-plugin/.grok-plugin ]; }
 readmes_cover_the_clients() {
   local f
   for f in README.md "$PLUGIN_README"; do
-    grep -qF 'Codex CLI' "$f" && grep -qF 'Antigravity CLI' "$f" && grep -qF 'load_context' "$f" && grep -qF 'installed by hand' "$f" || return 1
+    grep -qF 'Codex CLI' "$f" && grep -qF 'Antigravity CLI' "$f" && grep -qF 'load_context' "$f" && grep -qF 'codex-hooks.json' "$f" && grep -qF 'trust' "$f" && grep -qF 'codex plugin add alynki@alynki-marketplace' "$f" || return 1
   done
 }
 ok "every MCP file (.mcp.json, mcp.json, mcp_config.json, copilot-mcp.json) names the same url, https://mcp.alynki.com/mcp" mcp_urls_all_match
@@ -257,7 +258,7 @@ ok "the Antigravity hooks.json command prints the script's output (run from the 
 ok "session-start.sh copilot prints the wording as top-level additionalContext" copilot_output_has_the_wording
 ok "session-start.sh refuses an unknown shape" unknown_shape_refused
 ok "no Grok hook ships (Grok Build session hooks cannot inject)" no_grok_hook
-ok "both READMEs cover Codex CLI, Antigravity CLI, load_context and hand installs" readmes_cover_the_clients
+ok "both READMEs cover Codex CLI (its own hook file, the one-time trust, the marketplace install), Antigravity CLI and load_context" readmes_cover_the_clients
 
 # Codex gets its own hook file (alynki/alynki#3442): Codex drops a SessionStart output carrying initialUserMessage.
 CODEXHOOKS=alynki-plugin/hooks/codex-hooks.json
@@ -332,30 +333,35 @@ ok "the Copilot MCP config is wrapped in mcpServers with type http and a url" co
 ok "the Antigravity root hooks.json is named groups with no Copilot keys, and its manifest has no hooks field" antigravity_hooks_are_named_groups
 ok "both READMEs cover VS Code, GitHub Copilot CLI, chat.plugins.enabled and the preview status" readmes_cover_copilot
 
-# One list for every setup (alynki/alynki#3343, D9, J8): all 44 tools allowed, the list defined once.
-list_has_44_unique() {
-  [ "$(grep -c . "$LIST")" -eq 44 ] && [ "$(sort -u "$LIST" | grep -c .)" -eq 44 ] && ! grep -qvE '^[a-z]+(_[a-z]+)+$' "$LIST"
+# One pair of lists for every setup (alynki/alynki#3343, D9, J8; SEC-31, alynki/alynki#3447): 37 tools allowed,
+# the seven access-changing tools asking, each list defined once.
+SEVEN="create_principal_agent grant_principal invite_principal revoke_principal revoke_principal_agent revoke_principal_invite update_principal_agent"
+lists_are_37_and_the_seven() {
+  [ "$(grep -c . "$LIST")" -eq 37 ] && [ "$(sort -u "$LIST" | grep -c .)" -eq 37 ] && ! grep -qvE '^[a-z]+(_[a-z]+)+$' "$LIST" &&
+    [ "$(sort "$ASKLIST" | tr '\n' ' ' | sed 's/ $//')" = "$SEVEN" ] && [ -z "$(sort "$LIST" "$ASKLIST" | uniq -d)" ]
 }
 # A sample of names must appear in no other plugin file (the READMEs describe the tools; the hook wording names load_context).
 SAMPLE="grant_principal list_runs create_workflow delete_workflow save_check move_node revoke_principal_agent"
 no_second_copy() {
   local t
   for t in $SAMPLE; do
-    grep -qx "$t" "$LIST" || return 1
-    if grep -rlw --exclude-dir=.git --exclude=tools.txt --exclude=README.md --exclude=load-first.md -- "$t" alynki-plugin .claude-plugin | grep -q .; then return 1; fi
+    grep -qx "$t" "$LIST" "$ASKLIST" || return 1
+    if grep -rlw --exclude-dir=.git --exclude=tools.txt --exclude=ask-tools.txt --exclude=README.md --exclude=load-first.md -- "$t" alynki-plugin .claude-plugin | grep -q .; then return 1; fi
   done
 }
-# Run the Antigravity script under a temporary HOME holding other settings: it merges, a second run is byte-identical.
+# Run the Antigravity script under a temporary HOME holding other settings and the allow rules 0.29 wrote for two of
+# the seven: it merges the 37, removes the seven's allow rules, and a second run is byte-identical.
 agy_idempotent() {
   local h f a ok=1
   h=$(mktemp -d) || return 1
   f=$h/.gemini/antigravity-cli/settings.json
   mkdir -p "$(dirname "$f")"
-  printf '{"theme":"dark","permissions":{"deny":["command(sudo)"],"allow":["command(git)"]}}' >"$f"
+  printf '{"theme":"dark","permissions":{"deny":["command(sudo)"],"allow":["command(git)","mcp(alynki/grant_principal)","mcp(alynki/revoke_principal_agent)"]}}' >"$f"
   HOME=$h sh "$AGYSET" >/dev/null && cp "$f" "$h/first" && HOME=$h sh "$AGYSET" >/dev/null && cmp -s "$h/first" "$f" &&
     [ "$(jq -r '.theme' "$f")" = dark ] && [ "$(jq -c '.permissions.deny' "$f")" = '["command(sudo)"]' ] &&
-    [ "$(jq -r '.permissions.allow[0]' "$f")" = 'command(git)' ] && [ "$(jq -r '[.permissions.allow[] | select(startswith("mcp(alynki/"))] | length' "$f")" -eq 44 ] &&
-    [ "$(jq -r '.permissions.allow | length' "$f")" -eq 45 ] || ok=0
+    [ "$(jq -r '.permissions.allow[0]' "$f")" = 'command(git)' ] && [ "$(jq -r '[.permissions.allow[] | select(startswith("mcp(alynki/"))] | length' "$f")" -eq 37 ] &&
+    [ "$(jq -r '.permissions.allow | length' "$f")" -eq 38 ] || ok=0
+  for a in $SEVEN; do jq -e --arg r "mcp(alynki/$a)" '.permissions.allow | index($r) == null' "$f" >/dev/null || ok=0; done
   rm -rf "$h"
   [ "$ok" -eq 1 ]
 }
@@ -368,14 +374,23 @@ agy_refuses_bad_json() {
   rm -rf "$h"
   [ "$ok" -eq 1 ]
 }
-ok "the tool list has exactly 44 unique names, one per line" list_has_44_unique
+ok "tools.txt has exactly 37 unique names and ask-tools.txt exactly the seven access-changing tools, with no name in both" lists_are_37_and_the_seven
 skill_reads_list_no_wildcard() { grep -qF 'tools.txt' "$SKILL" && grep -qF 'never a wildcard' "$SKILL" && ! grep -qE 'Add .*mcp__plugin_alynki_alynki__\*' "$SKILL"; }
 ok "the Claude setup skill reads the shared list (tools.txt) and its add step writes exact names, never a wildcard" skill_reads_list_no_wildcard
+skill_asks_the_seven() {
+  grep -qF 'ask-tools.txt' "$SKILL" && grep -qF 'one rule in `permissions.ask` per tool in `ask-tools.txt`' "$SKILL" &&
+    grep -qF 'remove** from `permissions.allow` the exact rule of any tool in `ask-tools.txt`' "$SKILL" &&
+    grep -qF 'still ask a person each time' "$SKILL" && absent 'All 44 tools are allowed' "$SKILL"
+}
+ok "the Claude setup skill writes an ask rule for each of the seven and removes their allow rules" skill_asks_the_seven
 ok "the Antigravity script reads the shared list (tools.txt)" grep -qF 'tools.txt' "$AGYSET"
+ok "the Antigravity script reads the asking list (ask-tools.txt)" grep -qF 'ask-tools.txt' "$AGYSET"
 ok "no tool name outside the list file appears in the plugin's skill, scripts or manifests (no second copy)" no_second_copy
 ok "the Antigravity script merges and is idempotent under a temporary HOME (two runs, cmp)" agy_idempotent
 ok "the Antigravity script leaves an unparseable settings file untouched" agy_refuses_bad_json
 ok "both READMEs describe the setup per client and the shared list" bash -c 'grep -qF tools.txt README.md && grep -qF setup-antigravity.sh README.md && grep -qF setup-antigravity.sh alynki-plugin/README.md'
+ok "both READMEs say the seven access-changing tools ask (ask-tools.txt)" bash -c 'grep -qF ask-tools.txt README.md && grep -qF ask-tools.txt alynki-plugin/README.md'
+ok "the standard plugin's version is at least 0.30.0, the release in which the seven ask again" version_at_least "$STD" 0.30.0
 
 # The Microsoft 365 Copilot agent package (alynki/alynki#3357, D8, J12): Teams manifest 1.19, declarative agent v1.6, plugin v2.4,
 # sources under copilot/ (not in alynki-plugin/, which is the Claude, Codex and Antigravity plugin), built into a zip by copilot/build.sh.
@@ -407,6 +422,11 @@ copilot_tools_are_pinned() {
     [ -n "$f" ] && [ "$f" = "$r" ] && [ "$f" = "$m" ] && [ "$(jq -r '.runtimes[0].spec.mcp_tool_description.file' "$CP_PLUGIN")" = mcp-tools.json ] &&
     jq -e '[.tools[] | has("name") and has("description") and has("inputSchema")] | all' "$CP/mcp-tools.json" >/dev/null
 }
+# The admin centre refuses a function with no description (alynki/alynki#3458): each carries its tool's, from mcp-tools.json.
+copilot_functions_carry_descriptions() {
+  jq -e --slurpfile t "$CP/mcp-tools.json" '($t[0].tools | map({(.name): .description}) | add) as $d
+    | (.functions | length) > 0 and all(.functions[]; (.description // "") != "" and .description == $d[.name])' "$CP_PLUGIN" >/dev/null
+}
 copilot_pinned_tools_are_the_tool_list() {
   [ "$(jq -r '.tools[].name' "$CP/mcp-tools.json" | sort | tr '\n' ' ')" = "$(cat alynki-plugin/tools.txt alynki-plugin/ask-tools.txt 2>/dev/null | sort | tr '\n' ' ')" ]
 }
@@ -414,13 +434,23 @@ copilot_instructions_name_load_context() {
   jq -e '.instructions | contains("load_context") and contains("cursor") and (length <= 8000)' "$CP/declarativeAgent.json" >/dev/null &&
     jq -e '.description_for_model | contains("load_context")' "$CP_PLUGIN" >/dev/null
 }
+copilot_first_chat_connects() {
+  # the first chat only connects (#3463): Copilot calls no tool again in the chat where the person signed in,
+  # so the agent offers a Connect starter and sends questions to a new chat; wording that the tools are
+  # unavailable or cannot be called empties Copilot's function table, so it must never appear
+  jq -e '.conversation_starters[0] == {"title": "Connect to Alynki", "text": "Connect me to Alynki"}' "$CP/declarativeAgent.json" >/dev/null &&
+    jq -e '(.instructions | split("\n\n"))[2] | startswith("When the person has just allowed the connection or signed in to Alynki") and contains("call the tools again")' "$CP/declarativeAgent.json" >/dev/null &&
+    ! jq -r .instructions "$CP/declarativeAgent.json" | grep -qiE 'unavailable|not available|cannot be called|can not be called'
+}
 copilot_icons_have_their_sizes() {
   [ "$(jq -r '.icons.color' "$CP/manifest.json")" = color.png ] && [ "$(jq -r '.icons.outline' "$CP/manifest.json")" = outline.png ] &&
     [ "$(png_dims "$CP/color.png")" = 192x192 ] && [ "$(png_dims "$CP/outline.png")" = 32x32 ]
 }
 copilot_listing_fields() {
   jq -e '.developer.name == "Alynki" and .developer.websiteUrl == "https://alynki.com" and .developer.privacyUrl == "https://alynki.com/privacy/" and .developer.termsOfUseUrl == "https://alynki.com/terms/" and (.name.short == "Alynki")' "$CP/manifest.json" >/dev/null &&
-    [ "$(jq -r '.conversation_starters | length >= 3' "$CP/declarativeAgent.json")" = true ] && [ "$(jq -r .name "$CP/declarativeAgent.json")" = "$(jq -r .name.short "$CP/manifest.json")" ] && no_em_dash "$CP/manifest.json" "$CP/declarativeAgent.json" "$CP_PLUGIN"
+    [ "$(jq -r '.conversation_starters | length >= 3' "$CP/declarativeAgent.json")" = true ] && [ "$(jq -r .name "$CP/declarativeAgent.json")" = "$(jq -r .name.short "$CP/manifest.json")" ] && no_em_dash "$CP/manifest.json" "$CP/declarativeAgent.json" &&
+    # the functions carry the server's tool descriptions verbatim (#3458), as mcp-tools.json does; the rest of the plugin is listing copy
+    ! jq 'del(.functions)' "$CP_PLUGIN" | grep -q '—'
 }
 build_refuses_missing_and_placeholder() {
   local d rc=0
@@ -447,10 +477,12 @@ readme_covers_copilot_package() {
 }
 ok "the Copilot package's three JSON files parse" copilot_json_parses
 ok "the Copilot package is Teams manifest 1.19, declarative agent v1.6 and plugin v2.4, wired to each other, with a GUID id" copilot_schema_versions
+ok "the Copilot agent opens with a Connect starter, says to ask in a new chat after a sign-in, and never calls its tools unavailable" copilot_first_chat_connects
 ok "the plugin's runtime is one RemoteMCPServer at https://mcp.alynki.com/mcp, the url the MCP files carry" copilot_runtime_url
 ok "the plugin's auth is OAuthPluginVault with the placeholder reference_id (the real id is never committed)" copilot_auth_is_the_vault
 ok "the plugin pins its tools: functions, run_for_functions and mcp-tools.json name the same tools, each with a description and inputSchema" copilot_tools_are_pinned
 ok "the pinned tools are exactly the plugin's tool list" copilot_pinned_tools_are_the_tool_list
+ok "every Copilot function carries a non-empty description, its tool's from mcp-tools.json" copilot_functions_carry_descriptions
 ok "the agent's instructions name load_context, paging to a cursor, within 8000 characters" copilot_instructions_name_load_context
 ok "the icons are color.png 192x192 and outline.png 32x32, named by the manifest" copilot_icons_have_their_sizes
 ok "the manifest carries the developer, privacy and terms URLs; the agent has three prompt starters and the same name; no em dash" copilot_listing_fields
