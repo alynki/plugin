@@ -16,6 +16,8 @@ One plugin ships from this marketplace: **`alynki`**.
   `alynki-marketplace`, listing the plugin.
 - `alynki-plugin/` (`alynki`): an HTTP MCP connection, the `bin/headers.sh` header helper, the
   session hooks and the [`setup` skill](alynki-plugin/skills/setup/SKILL.md).
+- [`.cursor-plugin/marketplace.json`](.cursor-plugin/marketplace.json): the same listing in Cursor's format;
+  `alynki-plugin/.cursor-plugin/plugin.json` and `alynki-plugin/cursor-mcp.json` carry Cursor's setup.
 - `copilot/`: the sources and the build of the Microsoft 365 Copilot agent package, a zip (see
   [Microsoft 365 Copilot](#microsoft-365-copilot)). It is not part of `alynki-plugin/`.
 
@@ -94,6 +96,25 @@ copilot plugin install alynki@alynki-marketplace
 ```
 
 Copilot reads the root `plugin.json` (Copilot format), which names `hooks/copilot-hooks.json` (the `sessionStart` and `subagentStart` hooks) and `copilot-mcp.json` (the same address). Antigravity keeps the fixed root `hooks.json`, so the Copilot hooks sit in their own file. Sign in when the client first connects. Agent hooks in VS Code and Copilot CLI are in preview, and the instruction only runs where your organisation allows plugins and hooks: the VS Code policies `ChatPluginsEnabled`, `ChatAllowManagedHooksOnly` and `ChatStrictMarketplaces` can block either. Without the hook, ask your agent to call `load_context` first.
+
+### Cursor
+
+Add this to `~/.cursor/mcp.json` (or a project's `.cursor/mcp.json`), then sign in when Cursor first connects to `https://mcp.alynki.com/mcp`:
+
+```json
+{
+  "mcpServers": {
+    "alynki": {
+      "url": "https://mcp.alynki.com/mcp",
+      "auth": {
+        "CLIENT_ID": "alynki-cursor"
+      }
+    }
+  }
+}
+```
+
+`alynki-cursor` is Alynki's public client for Cursor: it holds no secret, so there is nothing to copy or keep, and every person still signs in as themselves in the browser (OAuth with PKCE). The plugin folder carries the same block in `alynki-plugin/cursor-mcp.json`, named by `alynki-plugin/.cursor-plugin/plugin.json`, with a root `.cursor-plugin/marketplace.json`, for a Cursor that installs from a plugin source. Cursor's documentation does not say whether it reads `auth` from a plugin's MCP file, so the block above is the setup to rely on. The connector's server instructions tell a new chat to call `load_context` first. More at https://alynki.com/docs/.
 
 ### Grok (Grok Build and grok.com)
 
@@ -304,7 +325,7 @@ entries:
 |---|---|
 | Claude Code | `/alynki:setup`, above. |
 | Antigravity CLI | `sh alynki-plugin/bin/setup-antigravity.sh` from a clone. It merges `mcp(alynki/<tool>)` rules for the 37 tools in `tools.txt` into `permissions.allow` of `~/.gemini/antigravity-cli/settings.json` and removes any allow rule for the seven in `ask-tools.txt`, so Antigravity asks before each of those; it keeps every other entry, and a second run changes nothing. Needs `jq`. Antigravity documents `mcp(server/*)` and `mcp(*)` wildcards too; the script writes the explicit list. |
-| Codex CLI, VS Code, GitHub Copilot CLI | No local permission file is written here; approve per your client's own prompt. |
+| Codex CLI, Cursor, VS Code, GitHub Copilot CLI | No local permission file is written here; approve per your client's own prompt. |
 | ChatGPT, Microsoft 365 Copilot, grok.com | Approval is set in the product, not on this machine; see the documentation page at https://alynki.com/docs/. |
 
 ## What the plugin runs, sends and fetches
@@ -314,6 +335,7 @@ including the one setting held in `settings.json` (*What it runs, sends and fetc
 
 ## Release notes
 
+- `alynki` 0.31.0: Cursor setup. `alynki-plugin/cursor-mcp.json` names `https://mcp.alynki.com/mcp` with `"auth": {"CLIENT_ID": "alynki-cursor"}`, the public client the Alynki auth server pre-registers for Cursor (no secret, PKCE); `alynki-plugin/.cursor-plugin/plugin.json` and a root `.cursor-plugin/marketplace.json` list it, and the Cursor section above shows the same block for a hand setup in `~/.cursor/mcp.json`. The auth server's metadata now lists `none` and `client_secret_basic` as the token endpoint's client authentication methods. No tool and no prompt added: 44 tools and 44 prompts.
 - `alynki` 0.30.0: `/alynki:setup` asks again before the seven access-changing tools (`grant_principal`,
   `revoke_principal`, `invite_principal`, `revoke_principal_invite`, `create_principal_agent`,
   `update_principal_agent`, `revoke_principal_agent`), reversing 0.29.0's allow-all: it allows the 37 tools in

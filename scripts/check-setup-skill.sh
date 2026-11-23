@@ -490,6 +490,31 @@ ok "copilot/build.sh refuses a missing, empty or placeholder registration id and
 ok "copilot/build.sh given a dummy id writes a zip, six files at its root, whose plugin carries the id" build_zip_carries_the_id
 ok "the README has a Microsoft 365 Copilot section: the build, the admin centre install, OAuthPluginVault" readme_covers_copilot_package
 
+# Cursor (alynki/alynki#3505): a public client, alynki-cursor, no secret; the block is in the plugin folder and in both READMEs.
+CUR=alynki-plugin/.cursor-plugin/plugin.json
+CURMCP=alynki-plugin/cursor-mcp.json
+CURMKT=.cursor-plugin/marketplace.json
+cursor_manifest_matches() {
+  [ "$(jq -r .name "$CUR")" = alynki ] && [ "$(jq -r .version "$CUR")" = "$(jq -r .version "$STD")" ] && [ "$(jq -r .mcpServers "$CUR")" = "./cursor-mcp.json" ] && [ -s "alynki-plugin/cursor-mcp.json" ]
+}
+cursor_mcp_is_the_public_client() {
+  [ "$(jq -r '.mcpServers.alynki.url' "$CURMCP")" = "$MCP_URL" ] && [ "$(jq -r '.mcpServers.alynki.auth.CLIENT_ID' "$CURMCP")" = alynki-cursor ] && [ "$(jq -r '.mcpServers.alynki.auth | keys | join(",")' "$CURMCP")" = CLIENT_ID ]
+}
+cursor_marketplace_lists_alynki() {
+  [ "$(jq -r '.plugins | length' "$CURMKT")" -eq 1 ] && [ "$(jq -r '.plugins[0].name' "$CURMKT")" = alynki ] && [ -d "$(jq -r '.plugins[0].source' "$CURMKT")" ]
+}
+readmes_show_the_cursor_block() {
+  local f
+  for f in README.md "$PLUGIN_README"; do
+    grep -qF '"CLIENT_ID": "alynki-cursor"' "$f" && grep -qF '.cursor/mcp.json' "$f" && grep -qF 'https://alynki.com/docs/' "$f" || return 1
+  done
+}
+ok "the standard plugin's version is at least 0.31.0, the release of the Cursor setup" version_at_least "$STD" 0.31.0
+ok "the Cursor manifest is named alynki, carries the Claude manifest's version and names cursor-mcp.json, which exists" cursor_manifest_matches
+ok "cursor-mcp.json names https://mcp.alynki.com/mcp with auth CLIENT_ID alynki-cursor and no secret" cursor_mcp_is_the_public_client
+ok "the Cursor marketplace lists alynki alone, from a folder that exists" cursor_marketplace_lists_alynki
+ok "both READMEs show Cursor's block (CLIENT_ID alynki-cursor, ~/.cursor/mcp.json) and link to alynki.com/docs" readmes_show_the_cursor_block
+
 echo "$n assertions, $failed failed"
 [ "$failed" -eq 0 ] || exit 1
 floor=${SETUP_CHECK_FLOOR:-0}
