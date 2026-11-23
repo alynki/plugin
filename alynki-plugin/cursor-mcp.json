@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "alynki": {
+      "url": "https://mcp.alynki.com/mcp",
+      "auth": {
+        "CLIENT_ID": "alynki-cursor"
+      }
+    }
+  }
+}

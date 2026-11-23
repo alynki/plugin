@@ -1,0 +1,13 @@
+{
+  "name": "alynki-marketplace",
+  "owner": {
+    "name": "Alynki"
+  },
+  "plugins": [
+    {
+      "name": "alynki",
+      "source": "alynki-plugin",
+      "description": "From your people to your customers, faster and with higher quality. Your people and their AI agents work from one business context layer, and every step is checked against it."
+    }
+  ]
+}
