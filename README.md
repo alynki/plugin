@@ -4,7 +4,7 @@ From your people to your customers, faster and with higher quality. Alynki is th
 
 Alynki requires an Alynki account. Request access at alynki.com/contact. Setup and examples: alynki.com/docs.
 
-To start in Claude Code, run `/plugin marketplace add alynki/plugin` and then `/plugin install alynki@alynki-marketplace`. The connection is bundled, so no other step is needed, and you sign in with your own identity the first time you use Alynki (*Install*).
+To start in Claude Code, run `/plugin marketplace add alynki/plugin` and then `/plugin install alynki@alynki-marketplace`, choose where to install it, then type `/mcp`, pick Alynki and choose Authenticate to sign in with your own identity (*Install*). The connection is bundled: there is no address to enter. Each client's section below links that vendor's own documentation, and [alynki.com/docs](https://alynki.com/docs) gives the same steps per client.
 
 This is the plugin for Alynki in Claude Code, Codex CLI and Antigravity CLI. It loads your organisation's context into every session: the policy and product context for the scope your credential holds and, where that scope sits in a workflow, the steps, checks and runs that define how the work is done. Alynki delivers to a principal only what that principal is granted; it does not constrain what an agent obtains from other sources.
 
@@ -65,18 +65,34 @@ the one its controller issues it, and never sees a sign-in prompt.
 
 ## Install
 
+Claude Code (Anthropic's [Install and manage plugins](https://code.claude.com/docs/en/plugins/install)):
+
 ```
 /plugin marketplace add alynki/plugin
 /plugin install alynki@alynki-marketplace
 ```
 
-That is the whole install: **the MCP connection is bundled**, with no `claude mcp add` step.
+1. `/plugin marketplace add` adds this repository as a marketplace.
+2. `/plugin install` opens the plugin's details in the `/plugin` panel, where you choose the scope: for you (user), for
+   everyone on this repository (project) or for you in this repository only (local).
+3. Type `/mcp`, pick Alynki and choose Authenticate, then sign in with your Alynki account.
+
+**The MCP connection is bundled**, with no `claude mcp add` step.
 
 ### Codex CLI
 
-Codex reads the same plugin folder (`alynki-plugin/`): its `.codex-plugin/plugin.json` names `mcp.json` and its own hook file, `hooks/codex-hooks.json` (the `codex` shape of `session-start.sh`, which prints `additionalContext` only). Install it with `codex plugin marketplace add alynki/plugin` and `codex plugin add alynki@alynki-marketplace`, then sign in when Codex first connects to `https://mcp.alynki.com/mcp`. Codex runs a plugin's hooks only once you have reviewed and trusted them in Codex (it skips them until then), so the session-start instruction starts after that one-time trust, and does not run from the public plugin directory. Without the hook, ask your agent to call `load_context` first, or rely on the server's own instructions.
+OpenAI's [Developer commands](https://developers.openai.com/codex/cli/reference):
+
+```
+codex plugin marketplace add alynki/plugin
+codex plugin add alynki@alynki-marketplace
+```
+
+Then sign in when Codex first connects to `https://mcp.alynki.com/mcp`. Codex reads the same plugin folder (`alynki-plugin/`): its `.codex-plugin/plugin.json` names `mcp.json` and its own hook file, `hooks/codex-hooks.json` (the `codex` shape of `session-start.sh`, which prints `additionalContext` only). Codex runs a plugin's hooks only once you have reviewed and trusted them in Codex (it skips them until then), so the session-start instruction starts after that one-time trust, and does not run from the public plugin directory. Without the hook, ask your agent to call `load_context` first, or rely on the server's own instructions.
 
 ### Antigravity CLI
+
+Google's [Plugins & skills](https://antigravity.google/docs/cli/plugins):
 
 ```
 agy plugin install https://github.com/alynki/plugin
@@ -84,11 +100,13 @@ agy plugin install https://github.com/alynki/plugin
 
 Antigravity reads `alynki-plugin/.antigravity-plugin/plugin.json`, `mcp_config.json` and `hooks.json`. If your version expects the plugin at the repository root, install from a local clone's `alynki-plugin/` folder instead: `agy plugin install <path>/alynki-plugin`. Sign in when Antigravity first connects. Run `agy plugin validate ./alynki-plugin` to check the folder; its warnings about `.mcp.json`, `mcp.json` and `hooks/hooks.json` are expected, since those files are for the other clients.
 
-### VS Code (GitHub Copilot)
+### GitHub Copilot
 
-Turn on the `chat.plugins.enabled` setting, then run "Chat: Install Plugin from Source" from the Command Palette and enter `alynki/plugin`.
+**VS Code** ([Agent plugins in VS Code](https://code.visualstudio.com/docs/agent-customization/agent-plugins)): turn on the
+`chat.plugins.enabled` setting, then run "Chat: Install Plugin from Source" from the Command Palette and enter the Git
+repository URL, `https://github.com/alynki/plugin`. Sign in when Copilot first connects.
 
-### GitHub Copilot CLI
+**Copilot CLI** (GitHub's [Finding and installing plugins](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/plugins-finding-installing)):
 
 ```
 copilot plugin marketplace add alynki/plugin
@@ -99,7 +117,10 @@ Copilot reads the root `plugin.json` (Copilot format), which names `hooks/copilo
 
 ### Cursor
 
-Add this to `~/.cursor/mcp.json` (or a project's `.cursor/mcp.json`), then sign in when Cursor first connects to `https://mcp.alynki.com/mcp`:
+Cursor's [Model Context Protocol (MCP)](https://cursor.com/docs/mcp): go to Customize and open the Cursor Marketplace,
+find Alynki and choose Add to Cursor, then sign in with your Alynki account.
+
+For a Cursor where Alynki is not listed, add this to `~/.cursor/mcp.json` (or a project's `.cursor/mcp.json`), then sign in when Cursor first connects to `https://mcp.alynki.com/mcp`:
 
 ```json
 {
@@ -118,6 +139,10 @@ Add this to `~/.cursor/mcp.json` (or a project's `.cursor/mcp.json`), then sign 
 
 ### Grok (Grok Build and grok.com)
 
+**grok.com** (xAI's [connectors page](https://docs.x.ai/grok/connectors)): go to grok.com/connectors and choose New
+Connector, pick Alynki from the catalog, and sign in with your Alynki account.
+
+**Grok Build** (xAI's [Skills, Plugins & Marketplaces](https://docs.x.ai/build/features/skills-plugins-marketplaces)):
 Grok reaches Alynki as a remote MCP connector at `https://mcp.alynki.com/mcp`; sign in when it first connects. Grok Build's session-start hooks only observe, so the plugin ships no hook for it. Add this one line to the global `~/.grok/AGENTS.md` (not a working-directory file, and not a file Codex also reads):
 
 ```text
@@ -128,7 +153,11 @@ grok.com reads the connector's server instructions, which already name `load_con
 
 ### ChatGPT
 
-Add Alynki as a connector (Settings, Apps and connectors, a custom connector at `https://mcp.alynki.com/mcp`) and sign in. ChatGPT has no session-start hook; the connector's server instructions tell a new chat to call `load_context` first.
+OpenAI's [Connected apps in ChatGPT](https://help.openai.com/en/articles/11487775-connected-apps-in-chatgpt): go to
+Settings → Plugins, search for Alynki, open it and choose Install, then choose Connect and sign in with your Alynki
+account. Adding it by its address instead, as a custom MCP server at `https://mcp.alynki.com/mcp`, is developer mode,
+which depends on your ChatGPT plan ([OpenAI's developer mode guide](https://developers.openai.com/api/docs/guides/developer-mode)).
+ChatGPT has no session-start hook; the connector's server instructions tell a new chat to call `load_context` first.
 
 ### Every client
 
@@ -389,6 +418,10 @@ including the one setting held in `settings.json` (*What it runs, sends and fetc
   agent tokens. The tool counts followed the server's tool list of that release (39 at the time).
 
 ## Microsoft 365 Copilot
+
+Where Alynki is listed (Microsoft's [Get more agents](https://support.microsoft.com/en-us/microsoft-365-copilot/get-more-agents-in-the-microsoft-365-copilot-app)):
+in the Microsoft Copilot app select All Agents, find Alynki and open its details, choose Add, then sign in with your
+Alynki account. With a work account you may see Request approval instead: your IT administrator approves it once.
 
 Microsoft 365 Copilot has no box for a remote MCP server's URL. A server reaches it only inside an
 app package: a declarative agent whose API plugin names the server and an OAuth client
