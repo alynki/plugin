@@ -33,7 +33,7 @@ Antigravity reads `.antigravity-plugin/plugin.json`, `mcp_config.json` and `hook
 
 ## GitHub Copilot
 
-**VS Code** ([Agent plugins in VS Code](https://code.visualstudio.com/docs/agent-customization/agent-plugins)): turn on the `chat.plugins.enabled` setting, then run "Chat: Install Plugin from Source" from the Command Palette and enter the Git repository URL, `https://github.com/alynki/plugin`.
+**VS Code** ([Agent plugins in VS Code](https://code.visualstudio.com/docs/agent-customization/agent-plugins)): turn on the `chat.plugins.enabled` setting, then run "Chat: Install Plugin from Source" from the Command Palette and enter the Git repository URL, `https://github.com/alynki/plugin`. Sign in when Copilot first connects.
 
 **Copilot CLI** (GitHub's [Finding and installing plugins](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/plugins-finding-installing)):
 
@@ -65,7 +65,7 @@ Cursor's [Model Context Protocol (MCP)](https://cursor.com/docs/mcp): go to Cust
 
 ## Grok Build
 
-Grok Build has no hook that can inject text into a session, so this plugin ships none. Add one line to `~/.grok/AGENTS.md`: call Alynki's `load_context` first.
+xAI's [Skills, Plugins & Marketplaces](https://docs.x.ai/build/features/skills-plugins-marketplaces). Grok Build has no hook that can inject text into a session, so this plugin ships none. Add one line to `~/.grok/AGENTS.md`: call Alynki's `load_context` first.
 
 ## Setup per client
 
