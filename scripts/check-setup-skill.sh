@@ -532,6 +532,7 @@ ok "the Claude hook output (session and subagent) carries the permission hint: /
 ok "the Codex hook output (session and subagent) carries the permission hint" bash -c "$(declare -f hint_in); LIST=$LIST; hint_in codex session && hint_in codex subagent"
 ok "the Antigravity session output carries the permission hint (setup-antigravity.sh)" bash -c "$(declare -f hint_in); LIST=$LIST; hint_in antigravity session"
 ok "the Copilot hook output (session and subagent) carries the permission hint" bash -c "$(declare -f hint_in); LIST=$LIST; hint_in copilot session && hint_in copilot subagent"
+ok "the standard plugin's version is at least 0.32.0, the release of the permission hint" version_at_least "$STD" 0.32.0
 ok "the hint's setup script exists and is the one the READMEs name" bash -c 'test -f alynki-plugin/bin/setup-antigravity.sh && grep -qF "bin/setup-antigravity.sh" alynki-plugin/hooks/load-first.md && grep -qF setup-antigravity.sh alynki-plugin/README.md'
 
 echo "$n assertions, $failed failed"
