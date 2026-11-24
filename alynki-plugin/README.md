@@ -6,22 +6,24 @@ Alynki requires an Alynki account. Request access at alynki.com/contact. Setup a
 
 ## Start
 
-In Claude Code, run these two commands. The connection is bundled, so no other step is needed. Codex CLI and Antigravity CLI are covered below.
+In Claude Code, run these two commands (Anthropic's [Install and manage plugins](https://code.claude.com/docs/en/plugins/install)). `/plugin install` opens the plugin's details in the `/plugin` panel, where you choose the scope (user, project or local). The connection is bundled, so there is no address to enter. The other clients are covered below, and [alynki.com/docs](https://alynki.com/docs) gives the same steps.
 
 ```
 /plugin marketplace add alynki/plugin
 /plugin install alynki@alynki-marketplace
 ```
 
-You need no token. The first time you use Alynki, Claude Code opens a browser window: sign in with the account your administrator invited, and approve the connection. If `/mcp` shows Alynki as needing sign-in, choose it there.
+You need no token. Type `/mcp`, pick Alynki and choose Authenticate: Claude Code opens a browser window, where you sign in with the account your administrator invited and approve the connection.
 
 If your operator issued you a pinned token, put it in the plugin's **Alynki API token** field (`/plugin`). It wins over signing in.
 
 ## Codex CLI
 
-Codex reads this folder as it is: `.codex-plugin/plugin.json`, `mcp.json` (the same address, with a transport `type`) and `hooks/codex-hooks.json`, which the Codex manifest names: the same script as Claude Code's hooks, printing `additionalContext` only, because Codex drops a hook output that carries a field it does not know. Install it with `codex plugin marketplace add alynki/plugin` and `codex plugin add alynki@alynki-marketplace`, and sign in when Codex first connects. Codex runs a plugin's hooks only after you review and trust them once in Codex, so the load-first instruction does not run from the public plugin directory. A session then starts with `load_context`; without the hook, ask your agent to call `load_context` first.
+OpenAI's [Developer commands](https://developers.openai.com/codex/cli/reference). Codex reads this folder as it is: `.codex-plugin/plugin.json`, `mcp.json` (the same address, with a transport `type`) and `hooks/codex-hooks.json`, which the Codex manifest names: the same script as Claude Code's hooks, printing `additionalContext` only, because Codex drops a hook output that carries a field it does not know. Install it with `codex plugin marketplace add alynki/plugin` and `codex plugin add alynki@alynki-marketplace`, and sign in when Codex first connects. Codex runs a plugin's hooks only after you review and trust them once in Codex, so the load-first instruction does not run from the public plugin directory. A session then starts with `load_context`; without the hook, ask your agent to call `load_context` first.
 
 ## Antigravity CLI
+
+Google's [Plugins & skills](https://antigravity.google/docs/cli/plugins):
 
 ```
 agy plugin install https://github.com/alynki/plugin
@@ -29,11 +31,11 @@ agy plugin install https://github.com/alynki/plugin
 
 Antigravity reads `.antigravity-plugin/plugin.json`, `mcp_config.json` and `hooks.json` from this folder. If your version needs the plugin at the root of what you install, run `agy plugin install <path>/alynki-plugin` from a clone. Sign in when Antigravity first connects. The `SessionStart` hook injects the same load-first text, so a session starts with `load_context`. `agy plugin validate` warns about `.mcp.json`, `mcp.json` and `hooks/hooks.json`; those files are for the other clients.
 
-## VS Code (GitHub Copilot)
+## GitHub Copilot
 
-Turn on the `chat.plugins.enabled` setting, then run "Chat: Install Plugin from Source" from the Command Palette and enter `alynki/plugin`.
+**VS Code** ([Agent plugins in VS Code](https://code.visualstudio.com/docs/agent-customization/agent-plugins)): turn on the `chat.plugins.enabled` setting, then run "Chat: Install Plugin from Source" from the Command Palette and enter the Git repository URL, `https://github.com/alynki/plugin`.
 
-## GitHub Copilot CLI
+**Copilot CLI** (GitHub's [Finding and installing plugins](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/plugins-finding-installing)):
 
 ```
 copilot plugin marketplace add alynki/plugin
@@ -44,7 +46,7 @@ Copilot reads the root `plugin.json` (Copilot format), which names `hooks/copilo
 
 ## Cursor
 
-Add this to `~/.cursor/mcp.json` (or a project's `.cursor/mcp.json`), then sign in when Cursor first connects to `https://mcp.alynki.com/mcp`:
+Cursor's [Model Context Protocol (MCP)](https://cursor.com/docs/mcp): go to Customize and open the Cursor Marketplace, find Alynki and choose Add to Cursor, then sign in. For a Cursor where Alynki is not listed, add this to `~/.cursor/mcp.json` (or a project's `.cursor/mcp.json`), then sign in when Cursor first connects to `https://mcp.alynki.com/mcp`:
 
 ```json
 {
