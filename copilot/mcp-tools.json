@@ -255,7 +255,7 @@
     },
     {
       "name": "create_trigger",
-      "description": "Creates a trigger on a workflow — a step's own sibling, but in TWO CALLS like create_workflow (its connection, config and filter are worth previewing). First call: workflow, label and config, with context_token; the reply is a tool error that is the preview, with a confirm token. Show it to the person, then send the same arguments plus confirm. position 0 is this workflow's start trigger (at most one); omitted, the trigger goes just before the last active step. Triggers and steps are numbered in one order by position, the start trigger being 1; this is the number the app shows. Two triggers never sit in a row and the last item is never a trigger: a step must sit between two triggers and follow the last one. connection is a connection's id (list_connections with workflow), on this workflow's node or above it; omitted, this is a schedule, judged by config's own RRULE fields instead. filter is a CEL expression over item (and, at a position after 0, trail); filter_rows is a simpler [{field, op, value}] alternative — give one, never both. check_every (seconds, 10-86400) is required with connection, omitted for a schedule.",
+      "description": "Creates a trigger on a workflow — a step's own sibling, but in TWO CALLS like create_workflow (its connection, config and filter are worth previewing). First call: workflow, label and config, with context_token; the reply is a tool error that is the preview, with a confirm token. Show it to the person, then send the same arguments plus confirm. position 0 is this workflow's start trigger (at most one); omitted, the trigger goes just before the last active step. Triggers and steps are numbered in one order by position, the start trigger being 1; this is the number the app shows. Two triggers never sit in a row and the last item is never a trigger: a step must sit between two triggers and follow the last one. connection is a connection's id (list_connections with workflow), on this workflow's node or above it; omitted, this is a schedule, judged by config's own RRULE fields instead. filter is a CEL expression over item (and, at a position after 0, trail); filter_rows is a simpler [{field, op, value}] alternative — give one, never both. check_every (seconds, 10-86400) is required with connection, omitted for a schedule. Alynki only stores this trigger; nothing runs when it is created. Later the customer's own controller fires it: a schedule at its own times, a connection trigger on each check, keeping only items that pass the filter. A start trigger starts one run per new item; a later trigger ends a waiting run's wait.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -277,7 +277,84 @@
           },
           "config": {
             "type": "object",
-            "description": "The trigger's config, by kind. No connection (schedule), all required: rrule, time (HH:MM), timezone (IANA), business_days (array of weekday codes, e.g. [\"MO\",\"TU\",\"WE\",\"TH\",\"FR\"]); optional: start_date, end_date. connection mcp: tool, arguments, items_pointer, id_field, timestamp_field. imap: folder. graph_drive/gdrive/storage: subfolder. command: args. http: none beyond the connection."
+            "description": "The trigger's stored settings. Which fields apply depends on the connection's kind; any other field is refused. With no connection (a schedule) give rrule, time, timezone and business_days. With a connection give only that kind's fields; an http connection takes none, so send {}.",
+            "properties": {
+              "rrule": {
+                "type": "string",
+                "description": "Schedule only, required: the recurrence rule (RFC 5545), for example FREQ=WEEKLY;BYDAY=MO,WE,FR."
+              },
+              "time": {
+                "type": "string",
+                "description": "Schedule only, required: the time of day, HH:MM, 24-hour."
+              },
+              "timezone": {
+                "type": "string",
+                "description": "Schedule only, required: an IANA time zone name, for example Australia/Melbourne."
+              },
+              "business_days": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Schedule only, required: the weekday codes the schedule may fire on, from MO, TU, WE, TH, FR, SA, SU."
+              },
+              "start_date": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Schedule only, optional: the first date, YYYY-MM-DD."
+              },
+              "end_date": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Schedule only, optional: the last date, YYYY-MM-DD, on or after start_date."
+              },
+              "folder": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "imap connection only, optional: the mailbox folder to watch."
+              },
+              "subfolder": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "graph_drive, gdrive or storage connection only, optional: the subfolder to watch."
+              },
+              "tool": {
+                "type": "string",
+                "description": "mcp connection only, required: the name of the tool on that connection to call on each check."
+              },
+              "arguments": {
+                "type": "object",
+                "description": "mcp connection only, optional: the arguments passed to that tool."
+              },
+              "items_pointer": {
+                "type": "string",
+                "description": "mcp connection only, optional: a JSON Pointer (RFC 6901) to where the items sit in the tool's result."
+              },
+              "id_field": {
+                "type": "string",
+                "description": "mcp connection only, required: the name of the field that identifies an item."
+              },
+              "timestamp_field": {
+                "type": "string",
+                "description": "mcp connection only, required: the name of the field that holds an item's time."
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "command connection only, optional: the arguments passed to the command."
+              }
+            },
+            "additionalProperties": false
           },
           "filter": {
             "type": "string",
@@ -453,7 +530,84 @@
                     },
                     "config": {
                       "type": "object",
-                      "description": "The trigger's config, by kind. No connection (schedule), all required: rrule, time (HH:MM), timezone (IANA), business_days (array of weekday codes, e.g. [\"MO\",\"TU\",\"WE\",\"TH\",\"FR\"]); optional: start_date, end_date. connection mcp: tool, arguments, items_pointer, id_field, timestamp_field. imap: folder. graph_drive/gdrive/storage: subfolder. command: args. http: none beyond the connection."
+                      "description": "The trigger's stored settings. Which fields apply depends on the connection's kind; any other field is refused. With no connection (a schedule) give rrule, time, timezone and business_days. With a connection give only that kind's fields; an http connection takes none, so send {}.",
+                      "properties": {
+                        "rrule": {
+                          "type": "string",
+                          "description": "Schedule only, required: the recurrence rule (RFC 5545), for example FREQ=WEEKLY;BYDAY=MO,WE,FR."
+                        },
+                        "time": {
+                          "type": "string",
+                          "description": "Schedule only, required: the time of day, HH:MM, 24-hour."
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "description": "Schedule only, required: an IANA time zone name, for example Australia/Melbourne."
+                        },
+                        "business_days": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Schedule only, required: the weekday codes the schedule may fire on, from MO, TU, WE, TH, FR, SA, SU."
+                        },
+                        "start_date": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Schedule only, optional: the first date, YYYY-MM-DD."
+                        },
+                        "end_date": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Schedule only, optional: the last date, YYYY-MM-DD, on or after start_date."
+                        },
+                        "folder": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "imap connection only, optional: the mailbox folder to watch."
+                        },
+                        "subfolder": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "graph_drive, gdrive or storage connection only, optional: the subfolder to watch."
+                        },
+                        "tool": {
+                          "type": "string",
+                          "description": "mcp connection only, required: the name of the tool on that connection to call on each check."
+                        },
+                        "arguments": {
+                          "type": "object",
+                          "description": "mcp connection only, optional: the arguments passed to that tool."
+                        },
+                        "items_pointer": {
+                          "type": "string",
+                          "description": "mcp connection only, optional: a JSON Pointer (RFC 6901) to where the items sit in the tool's result."
+                        },
+                        "id_field": {
+                          "type": "string",
+                          "description": "mcp connection only, required: the name of the field that identifies an item."
+                        },
+                        "timestamp_field": {
+                          "type": "string",
+                          "description": "mcp connection only, required: the name of the field that holds an item's time."
+                        },
+                        "args": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "command connection only, optional: the arguments passed to the command."
+                        }
+                      },
+                      "additionalProperties": false
                     },
                     "filter": {
                       "type": "string",
@@ -498,7 +652,7 @@
                 }
               ]
             },
-            "description": "The steps and triggers in order, each step with its checks in order. A trigger item carries \"trigger\" instead of \"step\". An empty array creates the workflow alone; steps are appended later with create_step, triggers with create_trigger."
+            "description": "Each item is a step or a trigger. The steps and triggers in order, each step with its checks in order. A trigger item carries \"trigger\" instead of \"step\". An empty array creates the workflow alone; steps are appended later with create_step, triggers with create_trigger."
           },
           "disabled": {
             "type": "boolean",
@@ -1939,7 +2093,84 @@
                     },
                     "config": {
                       "type": "object",
-                      "description": "The trigger's config, by kind. No connection (schedule), all required: rrule, time (HH:MM), timezone (IANA), business_days (array of weekday codes, e.g. [\"MO\",\"TU\",\"WE\",\"TH\",\"FR\"]); optional: start_date, end_date. connection mcp: tool, arguments, items_pointer, id_field, timestamp_field. imap: folder. graph_drive/gdrive/storage: subfolder. command: args. http: none beyond the connection."
+                      "description": "The trigger's stored settings. Which fields apply depends on the connection's kind; any other field is refused. With no connection (a schedule) give rrule, time, timezone and business_days. With a connection give only that kind's fields; an http connection takes none, so send {}.",
+                      "properties": {
+                        "rrule": {
+                          "type": "string",
+                          "description": "Schedule only, required: the recurrence rule (RFC 5545), for example FREQ=WEEKLY;BYDAY=MO,WE,FR."
+                        },
+                        "time": {
+                          "type": "string",
+                          "description": "Schedule only, required: the time of day, HH:MM, 24-hour."
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "description": "Schedule only, required: an IANA time zone name, for example Australia/Melbourne."
+                        },
+                        "business_days": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Schedule only, required: the weekday codes the schedule may fire on, from MO, TU, WE, TH, FR, SA, SU."
+                        },
+                        "start_date": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Schedule only, optional: the first date, YYYY-MM-DD."
+                        },
+                        "end_date": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Schedule only, optional: the last date, YYYY-MM-DD, on or after start_date."
+                        },
+                        "folder": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "imap connection only, optional: the mailbox folder to watch."
+                        },
+                        "subfolder": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "graph_drive, gdrive or storage connection only, optional: the subfolder to watch."
+                        },
+                        "tool": {
+                          "type": "string",
+                          "description": "mcp connection only, required: the name of the tool on that connection to call on each check."
+                        },
+                        "arguments": {
+                          "type": "object",
+                          "description": "mcp connection only, optional: the arguments passed to that tool."
+                        },
+                        "items_pointer": {
+                          "type": "string",
+                          "description": "mcp connection only, optional: a JSON Pointer (RFC 6901) to where the items sit in the tool's result."
+                        },
+                        "id_field": {
+                          "type": "string",
+                          "description": "mcp connection only, required: the name of the field that identifies an item."
+                        },
+                        "timestamp_field": {
+                          "type": "string",
+                          "description": "mcp connection only, required: the name of the field that holds an item's time."
+                        },
+                        "args": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "command connection only, optional: the arguments passed to the command."
+                        }
+                      },
+                      "additionalProperties": false
                     },
                     "filter": {
                       "type": "string",
@@ -1984,7 +2215,7 @@
                 }
               ]
             },
-            "description": "The WHOLE new shape, in order. Existing steps, checks and triggers are matched by label, case-insensitively; a trigger item carries \"trigger\" instead of \"step\". A trigger left out is removed the same as a step; omitting position on a matched trigger keeps it where it is."
+            "description": "Each item is a step or a trigger. The WHOLE new shape, in order. Existing steps, checks and triggers are matched by label, case-insensitively; a trigger item carries \"trigger\" instead of \"step\". A trigger left out is removed the same as a step; omitting position on a matched trigger keeps it where it is."
           },
           "disabled": {
             "type": "boolean",
