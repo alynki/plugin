@@ -171,9 +171,10 @@ ok "the README says each step output and check evaluation is saved with a reason
 # Directory validation (alynki/alynki#3148): hook commands are ${CLAUDE_PLUGIN_ROOT} paths, the hook text is kept as it was
 # (founder option B, 2026-11-15: any change to it is the founder's decision, so its hashes are pinned), the folder has its own LICENSE.
 HOOKS=alynki-plugin/hooks/hooks.json
-# The hook text now lives in hooks/load-first.md; the pins are the hashes of what `session-start.sh claude` prints, unchanged since #3148.
-SESSION_START_SHA256=65b193c0dc2e0ac96813b0c461d9c3a3a22e0fa6f7b932eb7f87ce6fee24e8b1
-SUBAGENT_START_SHA256=26cb4548b3e510fc6c4aec47bb86254fd6430fcef9071a16a41123b4ebdd13a7
+# The hook text now lives in hooks/load-first.md; the pins are the hashes of what `session-start.sh claude` prints. They changed once since #3148,
+# for the permission hint (alynki/alynki#3582), which the founder asked for.
+SESSION_START_SHA256=9146b1446215ecffbf5253af038fa9fbc7fec7e2a12e896c0c5f75956a2fc945
+SUBAGENT_START_SHA256=c791e9dd014a4a49a172438bc51499997954c0c2bb06c1ae1b26b86d547eae1e
 sha_of() { { sha256sum "$1" 2>/dev/null || shasum -a 256 "$1"; } | cut -d' ' -f1; }
 # shellcheck disable=SC2016 # ${CLAUDE_PLUGIN_ROOT} is literal text in the hook command
 hook_commands_use_plugin_root() {
@@ -514,6 +515,24 @@ ok "the Cursor manifest is named alynki, carries the Claude manifest's version a
 ok "cursor-mcp.json names https://mcp.alynki.com/mcp with auth CLIENT_ID alynki-cursor and no secret" cursor_mcp_is_the_public_client
 ok "the Cursor marketplace lists alynki alone, from a folder that exists" cursor_marketplace_lists_alynki
 ok "both READMEs show Cursor's block (CLIENT_ID alynki-cursor, ~/.cursor/mcp.json) and link to alynki.com/docs" readmes_show_the_cursor_block
+
+# The permission hint (alynki/alynki#3582): the server's refusal no longer names /alynki:setup, so the shared hook text tells the person
+# how to allow Alynki's tools in each client, in one paragraph every client reads. Each shape's session and subagent output must carry it.
+# The count it names is the length of tools.txt.
+hint_in() { # <shape> <event>: the printed output, once decoded, holds the whole hint
+  local out
+  out=$(sh alynki-plugin/hooks/session-start.sh "$1" "$2" </dev/null) || return 1
+  printf '%s' "$out" | grep -qF 'If load_context is refused for permission, do not retry.' &&
+    printf '%s' "$out" | grep -qF 'In Claude Code: run /alynki:setup, which allows '"$(grep -c . "$LIST")"' of Alynki' &&
+    printf '%s' "$out" | grep -qF 'In Antigravity CLI: run sh bin/setup-antigravity.sh' &&
+    printf '%s' "$out" | grep -qF 'In Codex CLI and in GitHub Copilot (VS Code or CLI): allow Alynki' &&
+    printf '%s' "$out" | grep -qF 'If no user is present, end the session.'
+}
+ok "the Claude hook output (session and subagent) carries the permission hint: /alynki:setup, the 37 tools of tools.txt" bash -c "$(declare -f hint_in); LIST=$LIST; hint_in claude session && hint_in claude subagent"
+ok "the Codex hook output (session and subagent) carries the permission hint" bash -c "$(declare -f hint_in); LIST=$LIST; hint_in codex session && hint_in codex subagent"
+ok "the Antigravity session output carries the permission hint (setup-antigravity.sh)" bash -c "$(declare -f hint_in); LIST=$LIST; hint_in antigravity session"
+ok "the Copilot hook output (session and subagent) carries the permission hint" bash -c "$(declare -f hint_in); LIST=$LIST; hint_in copilot session && hint_in copilot subagent"
+ok "the hint's setup script exists and is the one the READMEs name" bash -c 'test -f alynki-plugin/bin/setup-antigravity.sh && grep -qF "bin/setup-antigravity.sh" alynki-plugin/hooks/load-first.md && grep -qF setup-antigravity.sh alynki-plugin/README.md'
 
 echo "$n assertions, $failed failed"
 [ "$failed" -eq 0 ] || exit 1
