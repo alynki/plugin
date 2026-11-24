@@ -20,7 +20,7 @@ hdr=(-H "Content-Type: application/json" -H "Accept: application/json, text/even
 auth() { printf 'header = "Authorization: Bearer %s"\n' "$(cat "$tf")"; }
 heads=$(mktemp); trap 'rm -f "$heads"' EXIT
 auth | curl -sf -K - "${hdr[@]}" -D "$heads" -X POST "$url" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"copilot-gen-tools","version":"1"}}}' >/dev/null
-sid=$(grep -i '^mcp-session-id:' "$heads" | tr -d '\r' | awk '{print $2}')
+sid=$({ grep -i '^mcp-session-id:' "$heads" || true; } | tr -d '\r' | awk '{print $2}') # a stateless server sends none
 auth | curl -sf -K - "${hdr[@]}" ${sid:+-H "Mcp-Session-Id: $sid"} -X POST "$url" -d '{"jsonrpc":"2.0","method":"notifications/initialized"}' >/dev/null
 r=$(auth | curl -sf -K - "${hdr[@]}" ${sid:+-H "Mcp-Session-Id: $sid"} -X POST "$url" -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}')
 d=$(printf '%s' "$r" | sed -n 's/^data: //p' | tail -1); [ -n "$d" ] || d=$r
