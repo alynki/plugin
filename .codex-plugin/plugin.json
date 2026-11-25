@@ -1,6 +1,6 @@
 {
   "name": "alynki",
-  "version": "0.33.0",
+  "version": "0.33.1",
   "description": "From your people to your customers, faster and with higher quality. Your people and their AI agents work from one business context layer, and every step is checked against it.",
   "author": {
     "name": "Alynki"
@@ -8,8 +8,8 @@
   "homepage": "https://alynki.com",
   "repository": "https://github.com/alynki/plugin",
   "license": "MIT",
-  "mcpServers": "./mcp.json",
-  "hooks": "./hooks/codex-hooks.json",
+  "mcpServers": "./alynki-plugin/mcp.json",
+  "hooks": "./alynki-plugin/hooks/codex-hooks.json",
   "interface": {
     "displayName": "Alynki",
     "shortDescription": "One business context layer for your people and their AI agents.",
@@ -17,6 +17,7 @@
     "category": "Productivity",
     "websiteURL": "https://alynki.com",
     "privacyPolicyURL": "https://alynki.com/privacy/",
-    "logo": "./.claude-plugin/icon.png"
-  }
+    "logo": "./alynki-plugin/.claude-plugin/icon.png"
+  },
+  "skills": "./alynki-plugin/skills/"
 }

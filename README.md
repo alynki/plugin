@@ -18,6 +18,9 @@ One plugin ships from this marketplace: **`alynki`**.
   session hooks and the [`setup` skill](alynki-plugin/skills/setup/SKILL.md).
 - [`.cursor-plugin/marketplace.json`](.cursor-plugin/marketplace.json): the same listing in Cursor's format;
   `alynki-plugin/.cursor-plugin/plugin.json` and `alynki-plugin/cursor-mcp.json` carry Cursor's setup.
+- [`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json) and
+  [`.codex-plugin/plugin.json`](.codex-plugin/plugin.json): the same listing and manifest for Codex, which installs
+  from the repository root and reads its files from `alynki-plugin/`.
 - `copilot/`: the sources and the build of the Microsoft 365 Copilot agent package, a zip (see
   [Microsoft 365 Copilot](#microsoft-365-copilot)). It is not part of `alynki-plugin/`.
 
@@ -88,7 +91,7 @@ codex plugin marketplace add alynki/plugin
 codex plugin add alynki@alynki-marketplace
 ```
 
-Then sign in when Codex first connects to `https://mcp.alynki.com/mcp`. Codex reads the same plugin folder (`alynki-plugin/`): its `.codex-plugin/plugin.json` names `mcp.json` and its own hook file, `hooks/codex-hooks.json` (the `codex` shape of `session-start.sh`, which prints `additionalContext` only). Codex runs a plugin's hooks only once you have reviewed and trusted them in Codex (it skips them until then), so the session-start instruction starts after that one-time trust, and does not run from the public plugin directory. Without the hook, ask your agent to call `load_context` first, or rely on the server's own instructions.
+Then sign in when Codex first connects to `https://mcp.alynki.com/mcp`. Codex installs from the repository root, which its `.agents/plugins/marketplace.json` names: the root `.codex-plugin/plugin.json` points into `alynki-plugin/` for `mcp.json`, the skills and its own hook file, `alynki-plugin/hooks/codex-hooks.json` (the `codex` shape of `session-start.sh`, which prints `additionalContext` only). It cannot install `alynki-plugin/` itself: Codex loads no hooks for a folder whose root `plugin.json` is an Agent Plugins manifest. Codex runs a plugin's hooks only once you have reviewed and trusted them with `/hooks` in Codex (it skips them until then), so the session-start instruction starts after that one-time trust, and does not run from the public plugin directory. Without the hook, ask your agent to call `load_context` first, or rely on the server's own instructions.
 
 ### Antigravity CLI
 
@@ -362,6 +365,7 @@ including the one setting held in `settings.json` (*What it runs, sends and fetc
 
 ## Release notes
 
+- `alynki` 0.33.1: Codex lists the plugin's session-start and subagent-start hooks again. In 0.33.0 the Agent Plugins manifest made Codex ignore them, so Codex now installs from the repository root (`.agents/plugins/marketplace.json`, `.codex-plugin/plugin.json`). Codex users: run `codex plugin marketplace upgrade` and add the plugin again, then trust the hooks with `/hooks`. No change for the other clients. No tool and no prompt added: 44 tools and 44 prompts (alynki/alynki#3667).
 - `alynki` 0.33.0: the root `alynki-plugin/plugin.json` is now an Agent Plugins v1.0.0 manifest, so Copilot CLI and VS Code read the server from `mcp.json` and the hooks from `com.github.copilot/hooks/hooks.json`; `copilot-mcp.json` and `hooks/copilot-hooks.json` are gone. Update the plugin to this version. No tool and no prompt added: 44 tools and 44 prompts. Cursor: the plugin ships its own session-start and subagent-start hooks (`hooks/cursor-hooks.json`) and a logo, and the READMEs no longer say Alynki is listed in the Cursor Marketplace or Grok's connector catalog (alynki/alynki#3656). Antigravity Marketplace: the Antigravity manifest names `assets/logo-padded.png` (outside dot folders) and three starter prompts; `assets/logo.png` is the 512 by 512 listing icon (alynki/alynki#3660).
 - `alynki` 0.32.0: the permission hint moves into the plugin. The Alynki server's instructions no longer name `/alynki:setup` (OpenAI's plugin scanner read it as pointing to another plugin; alynki/alynki#3580); the shared hook text `alynki-plugin/hooks/load-first.md` now says, for each client, how to allow Alynki's tools when `load_context` is refused for permission: Claude Code runs `/alynki:setup`, Antigravity CLI runs `sh bin/setup-antigravity.sh`, Codex CLI and GitHub Copilot allow Alynki in their own tool permissions, and with no user present the session ends. `copilot/mcp-tools.json` and `alynki-plugin.json` carry the server's new texts (the typed trigger `config`, alynki/alynki#3581). No tool and no prompt added: 44 tools and 44 prompts.
   The Copilot agent package is 1.0.10. `copilot/gen-tools.sh` now accepts a server that sends no `Mcp-Session-Id` (a stateless one, such as a local build), so the JSON can be generated from the release before it deploys.

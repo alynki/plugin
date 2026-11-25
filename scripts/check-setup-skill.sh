@@ -214,7 +214,7 @@ ok "the plugin's version is named in the README's release notes" grep -qF "\`aly
 
 # One plugin for every client (alynki/alynki#3349): one wording file, one script, one address, one version.
 ok "the standard plugin's version is at least 0.29.0, the release of one plugin for every client" version_at_least "$STD" 0.29.0
-CODEX=alynki-plugin/.codex-plugin/plugin.json
+CODEX=.codex-plugin/plugin.json
 AGY=alynki-plugin/.antigravity-plugin/plugin.json
 MCP_URL=https://mcp.alynki.com/mcp
 # One url per MCP file; Claude's .mcp.json is the server itself, the others sit under mcpServers.alynki.
@@ -279,11 +279,11 @@ ok "both READMEs cover Codex CLI (its own hook file, the one-time trust, the mar
 
 # Codex gets its own hook file (alynki/alynki#3442): Codex drops a SessionStart output carrying initialUserMessage.
 CODEXHOOKS=alynki-plugin/hooks/codex-hooks.json
-codex_manifest_names_its_hooks() { [ "$(jq -r .hooks "$CODEX")" = "./hooks/codex-hooks.json" ] && [ -s "$CODEXHOOKS" ]; }
+codex_manifest_names_its_hooks() { [ "$(jq -r .hooks "$CODEX")" = "./$CODEXHOOKS" ] && [ -s "$CODEXHOOKS" ]; }
 # shellcheck disable=SC2016 # ${PLUGIN_ROOT} is literal text in the hook command
 codex_hook_commands_use_the_codex_shape() {
-  [ "$(jq -r '.hooks.SessionStart[0].hooks[0].command' "$CODEXHOOKS")" = 'sh "${PLUGIN_ROOT}"/hooks/session-start.sh codex session' ] &&
-    [ "$(jq -r '.hooks.SubagentStart[0].hooks[0].command' "$CODEXHOOKS")" = 'sh "${PLUGIN_ROOT}"/hooks/session-start.sh codex subagent' ] &&
+  [ "$(jq -r '.hooks.SessionStart[0].hooks[0].command' "$CODEXHOOKS")" = 'sh "${PLUGIN_ROOT}"/alynki-plugin/hooks/session-start.sh codex session' ] &&
+    [ "$(jq -r '.hooks.SubagentStart[0].hooks[0].command' "$CODEXHOOKS")" = 'sh "${PLUGIN_ROOT}"/alynki-plugin/hooks/session-start.sh codex subagent' ] &&
     [ "$(jq -r '[.hooks[][].hooks[].command] | length' "$CODEXHOOKS")" -eq 2 ]
 }
 codex_session_output_is_additional_context_only() {
@@ -292,10 +292,34 @@ codex_session_output_is_additional_context_only() {
 }
 codex_hook_commands_print_the_output() {
   local d out
-  d=$PWD/alynki-plugin
+  d=$(codex_plugin_root) || return 1
   out=$(PLUGIN_ROOT=$d sh -c "$(jq -r '.hooks.SessionStart[0].hooks[0].command' "$CODEXHOOKS")" </dev/null) && [ "$out" = "$(sh alynki-plugin/hooks/session-start.sh codex session </dev/null)" ] &&
     out=$(PLUGIN_ROOT=$d sh -c "$(jq -r '.hooks.SubagentStart[0].hooks[0].command' "$CODEXHOOKS")" </dev/null) && [ "$out" = "$(claude_output subagent)" ]
 }
+# What Codex installs (alynki/alynki#3668): it reads .agents/plugins/marketplace.json before .claude-plugin/, and in the
+# plugin folder a root Agent Plugins plugin.json wins over .codex-plugin/plugin.json and loads no hooks (Codex 0.171.0).
+# codex_plugin_root: the folder Codex installs, resolved in Codex's order of marketplace files.
+codex_plugin_root() {
+  local m src
+  for m in .agents/plugins/marketplace.json .agents/plugins/api_marketplace.json .claude-plugin/marketplace.json .cursor-plugin/marketplace.json; do
+    [ -f "$m" ] || continue
+    src=$(jq -er '.plugins[] | select(.name == "alynki") | .source | if type == "string" then . else .path end' "$m") || return 1
+    (cd "$src" && pwd)
+    return
+  done
+  return 1
+}
+codex_installs_a_plugin_with_hooks() {
+  local d f
+  d=$(codex_plugin_root) || return 1
+  if [ -f "$d/plugin.json" ] && jq -e '(."$schema" // "") | startswith("https://agent-plugins.org/")' "$d/plugin.json" >/dev/null; then return 1; fi
+  f=$d/.codex-plugin/plugin.json
+  [ -f "$d/$(jq -er .hooks "$f")" ] && [ -f "$d/$(jq -er .mcpServers "$f")" ] && [ -d "$d/$(jq -er .skills "$f")" ] && [ -f "$d/$(jq -er .interface.logo "$f")" ]
+}
+codex_marketplace_matches() { [ "$(jq -r .name .agents/plugins/marketplace.json)" = "$(jq -r .name .claude-plugin/marketplace.json)" ]; }
+ok "the folder Codex installs has no root Agent Plugins plugin.json, and its Codex manifest names files that exist" codex_installs_a_plugin_with_hooks
+ok "the Codex marketplace carries the Claude marketplace's name" codex_marketplace_matches
+ok "the standard plugin's version is at least 0.33.1, the release of the Codex root layout" version_at_least "$STD" 0.33.1
 ok "the standard plugin's version is at least 0.29.1, the release of the Codex hook file" version_at_least "$STD" 0.29.1
 ok "the Codex manifest names hooks/codex-hooks.json, which exists" codex_manifest_names_its_hooks
 ok "codex-hooks.json runs session-start.sh codex for SessionStart and SubagentStart, from PLUGIN_ROOT" codex_hook_commands_use_the_codex_shape
