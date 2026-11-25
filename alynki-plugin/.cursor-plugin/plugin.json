@@ -9,6 +9,7 @@
   "repository": "https://github.com/alynki/plugin",
   "license": "MIT",
   "mcpServers": "./cursor-mcp.json",
+  "skills": "./cursor/skills/",
   "hooks": "./hooks/cursor-hooks.json",
   "logo": "./assets/logo.png"
 }

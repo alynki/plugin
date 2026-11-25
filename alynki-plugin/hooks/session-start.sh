@@ -19,6 +19,10 @@ if [ "$shape" = copilot ]; then
   text=$(printf '%s' "$text" |
     sed -e "s#In GitHub Copilot (VS Code or CLI): allow Alynki's tools in that client's tool permissions\.#In GitHub Copilot CLI: run /alynki:setup, which allows $(grep -c . "$here/../tools.txt") of Alynki's tools once for this machine. In GitHub Copilot in VS Code: allow Alynki's tools in that client's tool permissions.#")
 fi
+# Cursor's own setup step, added after the shared wording.
+if [ "$shape" = cursor ]; then
+  text="$text In Cursor: run /alynki-setup, which allows the same 37 for this machine."
+fi
 # JSON string body: escape \ and ", turn newlines into \n, write the em dash as —.
 body=$(printf '%s' "$text" |
   sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/—/\\u2014/g' |
