@@ -71,6 +71,7 @@ xAI's [Skills, Plugins & Marketplaces](https://docs.x.ai/build/features/skills-p
 
 - **Claude Code:** run `/alynki:setup` once.
 - **Antigravity CLI:** run `/setup` once and approve its one command outside the sandbox. It runs `bin/setup-antigravity.sh` (needs `jq`), which writes to `~/.gemini/antigravity-cli/settings.json` a `mcp(alynki_alynki/<tool>)` rule in `permissions.allow` for the 37 tools in `tools.txt` and in `permissions.ask` for the seven access-changing tools in `ask-tools.txt`, removes any allow rule for those seven, keeps your other entries, and changes nothing on a second run. It names, and leaves for you to remove, any allow rule under the old server name `alynki` (or a wildcard) that lets one of the seven run without asking.
+- **GitHub Copilot CLI:** run `/alynki:setup` once. It runs `bin/setup-copilot.sh`: hooks then allow the 37 tools of `tools.txt` and make the seven of `ask-tools.txt` ask each time; `--undo` reverses it. Limits: the hooks recognise Alynki by the server name `alynki` only, so any server of that name is treated as Alynki's; hooks run only in a folder you have trusted; if the hook script crashes, Copilot denies the call; autopilot treats ask as deny; not on Windows.
 - **Other clients:** no local permission file; see https://alynki.com/docs/.
 
 ## What you can ask

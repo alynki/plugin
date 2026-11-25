@@ -14,6 +14,22 @@
         "command": "sh \"${PLUGIN_ROOT}/hooks/session-start.sh\" copilot subagent",
         "timeoutSec": 30
       }
+    ],
+    "permissionRequest": [
+      {
+        "type": "command",
+        "matcher": "alynki/.*",
+        "command": "sh \"${PLUGIN_ROOT}/com.github.copilot/hooks/allow-tools.sh\"",
+        "timeoutSec": 30
+      }
+    ],
+    "preToolUse": [
+      {
+        "type": "command",
+        "matcher": "alynki-.*",
+        "command": "sh \"${PLUGIN_ROOT}/com.github.copilot/hooks/allow-tools.sh\" ask",
+        "timeoutSec": 30
+      }
     ]
   }
 }
