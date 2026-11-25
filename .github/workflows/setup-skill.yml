@@ -14,5 +14,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: The setup skill's ask rules, and the README
         env:
-          SETUP_CHECK_FLOOR: "118"
+          SETUP_CHECK_FLOOR: "120"
         run: scripts/check-setup-skill.sh
