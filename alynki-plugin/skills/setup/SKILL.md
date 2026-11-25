@@ -7,8 +7,9 @@ description: Allow 37 Alynki MCP tools without a prompt on this machine, so Alyn
 
 Adds an exact-name rule to `permissions.allow` for each of the 37 Alynki MCP tools in
 `${CLAUDE_PLUGIN_ROOT}/tools.txt`, and an exact-name rule to `permissions.ask` for each of the seven
-in `${CLAUDE_PLUGIN_ROOT}/ask-tools.txt`, in the user's own settings file, `~/.claude/settings.json`,
-so the grant applies everywhere on this machine rather than in one repository.
+in `${CLAUDE_PLUGIN_ROOT}/ask-tools.txt`, in the user's own settings file, `settings.json` in the Claude folder (`$CLAUDE_CONFIG_DIR` when that
+variable is set, `~/.claude` otherwise), so the grant applies everywhere on this machine rather than in
+one repository.
 
 The seven ask a person before each call because they change who has access to an organisation's
 context or manage the agents that act in it (granting, revoking and inviting people; creating,
@@ -27,8 +28,8 @@ tokens or paths.
 Accepting a permission prompt saves the rule to `.claude/settings.local.json` at the root of the git
 repository, or, outside a repository, to the directory the session started in. Either way the grant
 is local to that place, so a session started anywhere else prompts again. Alynki loads its context
-at the start of every session, so a per-place grant is met repeatedly. A rule in
-`~/.claude/settings.json` is read everywhere on that machine.
+at the start of every session, so a per-place grant is met repeatedly. A rule in the user's
+`settings.json` is read everywhere on that machine.
 
 ## Identity, not name
 
@@ -60,7 +61,10 @@ server's entitlement checks still bound what any call can do.
    the user of any name in the lists that this session does not have, and any matching tool this
    session has that neither list holds; write the lists' names regardless.
 
-3. **Read `~/.claude/settings.json`.** If it does not exist, treat it as `{}`. If it exists but is
+3. **Find the settings file.** Run `printf '%s' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"` and use
+   `settings.json` in the folder it prints: Claude Code reads its settings from `$CLAUDE_CONFIG_DIR`
+   when that variable is set, so a rule written to `~/.claude/settings.json` would not apply there.
+   **Read that file.** If it does not exist, treat it as `{}`. If it exists but is
    not valid JSON, stop and say so, and never overwrite a file you could not parse.
 
 4. **Write the rules**, each `mcp__plugin_alynki_alynki__<tool>`, never a wildcard:
@@ -91,7 +95,7 @@ server's entitlement checks still bound what any call can do.
 
 ## Constraints
 
-- Write only to `~/.claude/settings.json`. Never touch `settings.local.json`, project settings, or
+- Write only to the settings file of step 3. Never touch `settings.local.json`, project settings, or
   managed settings.
 - Change no key other than `permissions.allow` and `permissions.ask`, and in them add or remove only
   the exact-name rules of step 4. Never remove or rewrite any other entry.
@@ -102,8 +106,8 @@ server's entitlement checks still bound what any call can do.
 
 These rules live in their settings file, not in the plugin, so **removing the plugin does not remove
 them**. They can undo the grant with `/permissions`, or by deleting the entries from
-`~/.claude/settings.json`. Deleting an ask rule removes the prompt on that tool.
+the settings file of step 3. Deleting an ask rule removes the prompt on that tool.
 
-Running this command itself still prompts once, for its own write to `~/.claude/settings.json`:
-`~/.claude` is a protected path and no allow rule can suppress that. It removes every *subsequent*
+Running this command itself still prompts once, for its own write to that settings file: the Claude
+folder is a protected path and no allow rule can suppress that. It removes every *subsequent*
 Alynki prompt except the seven asking tools', not its own.
