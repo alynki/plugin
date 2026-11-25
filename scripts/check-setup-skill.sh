@@ -254,6 +254,22 @@ ok "the hook wording exists in one place, hooks/load-first.md" wording_only_in_l
 ok "the Codex and Antigravity manifests carry the Claude manifest's version" versions_all_match
 ok "the Codex and Antigravity manifests are named alynki" names_all_match
 ok "the Codex mcp.json declares a transport type and a url" codex_mcp_declares_transport
+# The Antigravity Marketplace (alynki/alynki#3660): its bundle leaves out any path with a part starting with ".",
+# and a submission needs three or fewer starter prompts and a square logo of 128 px or more.
+agy_logo_is_bundled() {
+  local rel f dims
+  rel=$(jq -r .logo "$AGY"); f=alynki-plugin/$rel
+  case "/$rel" in */.*) return 1 ;; esac
+  [ -f "$f" ] || return 1
+  # PNG IHDR: width and height are the big-endian words at bytes 16-23
+  dims=$(od -An -tu1 -j16 -N8 "$f" | awk 'NF == 8 {print $1*16777216+$2*65536+$3*256+$4, $5*16777216+$6*65536+$7*256+$8}')
+  [ "${dims% *}" = "${dims#* }" ] && [ "${dims% *}" -ge 128 ]
+}
+agy_has_starter_prompts() { jq -e '(.suggestedPrompts | length) == 3 and all(.suggestedPrompts[]; test("\\S"))' "$AGY" >/dev/null; }
+listing_logo_matches() { cmp -s alynki-plugin/assets/logo.png alynki-plugin/.claude-plugin/icon.png; }
+ok "the Antigravity logo is a bundled square PNG of 128 px or more, outside dot folders" agy_logo_is_bundled
+ok "the Antigravity manifest carries three starter prompts" agy_has_starter_prompts
+ok "assets/logo.png is the listing icon" listing_logo_matches
 ok "session-start.sh antigravity prints the wording as an injected systemMessage" antigravity_output_injects_the_wording
 ok "the Antigravity hooks.json command prints the script's output (run from the plugin root)" antigravity_hook_runs_the_script
 ok "session-start.sh copilot prints the wording as top-level additionalContext" copilot_output_has_the_wording
