@@ -132,6 +132,7 @@ ok "the README names the sealed variant, its server segment and its local binary
 ok "the release note names the commit that last carried the sealed variant (a full 40-character SHA)" note_names_the_commit
 ok "the setup skill, the plugin folder and the marketplace name no sealed variant, server segment or local binary" plugin_folder_names_it_nowhere
 ok "the setup skill recognises one server segment, plugin_alynki_alynki, by literal equality" grep -qF 'exactly one server segment' "$SKILL"
+ok "the setup skill writes to the Claude folder of CLAUDE_CONFIG_DIR when set, ~/.claude otherwise (#3679)" bash -c 'grep -qF "\${CLAUDE_CONFIG_DIR:-\$HOME/.claude}" "$1" && ! grep -qF "Write only to \`~/.claude/settings.json\`" "$1" && ! grep -qF "**Read \`~/.claude/settings.json\`.**" "$1"' _ "$SKILL"
 
 # The listing (alynki/alynki#3263): words from the approved listing kit, the icon, the URLs and the plugin's own README.
 PLUGIN_README=alynki-plugin/README.md

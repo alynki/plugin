@@ -312,7 +312,7 @@ Run once, in any session:
 /alynki:setup
 ```
 
-It shows the edit, then adds to your own `~/.claude/settings.json`, machine-wide, one exact-name rule
+It shows the edit, then adds to your own `settings.json` in the Claude folder (`$CLAUDE_CONFIG_DIR` when set, `~/.claude` otherwise), machine-wide, one exact-name rule
 in `permissions.allow` for each of 37 Alynki tools, and one exact-name rule in `permissions.ask` for
 each of the seven that change who has access or manage the agents (`grant_principal`,
 `revoke_principal`, `invite_principal`, `revoke_principal_invite`, `create_principal_agent`,
@@ -330,7 +330,7 @@ list gains it and the setup is run again.
 allow rule suppresses that prompt. It removes every *subsequent* Alynki prompt, not its own.
 
 To grant it by hand, add one `permissions.allow` entry per line of `tools.txt` and one
-`permissions.ask` entry per line of `ask-tools.txt` to `~/.claude/settings.json`, keeping existing
+`permissions.ask` entry per line of `ask-tools.txt` to that `settings.json`, keeping existing
 entries:
 
 ```json
