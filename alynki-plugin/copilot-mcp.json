@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "alynki": {
-      "type": "http",
-      "url": "https://mcp.alynki.com/mcp"
-    }
-  }
-}

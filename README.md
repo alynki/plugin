@@ -113,14 +113,11 @@ copilot plugin marketplace add alynki/plugin
 copilot plugin install alynki@alynki-marketplace
 ```
 
-Copilot reads the root `plugin.json` (Copilot format), which names `hooks/copilot-hooks.json` (the `sessionStart` and `subagentStart` hooks) and `copilot-mcp.json` (the same address). Antigravity keeps the fixed root `hooks.json`, so the Copilot hooks sit in their own file. Sign in when the client first connects. Agent hooks in VS Code and Copilot CLI are in preview, and the instruction only runs where your organisation allows plugins and hooks: the VS Code policies `ChatPluginsEnabled`, `ChatAllowManagedHooksOnly` and `ChatStrictMarketplaces` can block either. Without the hook, ask your agent to call `load_context` first.
+Copilot reads the root `plugin.json`, an [Agent Plugins](https://agent-plugins.org/) v1.0.0 manifest, then `mcp.json` (the server's address) and `com.github.copilot/hooks/hooks.json` (the `sessionStart` and `subagentStart` hooks). Sign in when the client first connects. Agent hooks in VS Code and Copilot CLI are in preview, and the instruction only runs where your organisation allows plugins and hooks: the VS Code policies `ChatPluginsEnabled`, `ChatAllowManagedHooksOnly` and `ChatStrictMarketplaces` can block either. Without the hook, ask your agent to call `load_context` first.
 
 ### Cursor
 
-Cursor's [Model Context Protocol (MCP)](https://cursor.com/docs/mcp): go to Customize and open the Cursor Marketplace,
-find Alynki and choose Add to Cursor, then sign in with your Alynki account.
-
-For a Cursor where Alynki is not listed, add this to `~/.cursor/mcp.json` (or a project's `.cursor/mcp.json`), then sign in when Cursor first connects to `https://mcp.alynki.com/mcp`:
+Cursor's [Model Context Protocol (MCP)](https://cursor.com/docs/mcp). Alynki is not yet listed in the Cursor Marketplace, so add this to `~/.cursor/mcp.json` (or a project's `.cursor/mcp.json`), then sign in with your Alynki account when Cursor first connects to `https://mcp.alynki.com/mcp`:
 
 ```json
 {
@@ -135,12 +132,12 @@ For a Cursor where Alynki is not listed, add this to `~/.cursor/mcp.json` (or a 
 }
 ```
 
-`alynki-cursor` is Alynki's public client for Cursor: it holds no secret, so there is nothing to copy or keep, and every person still signs in as themselves in the browser (OAuth with PKCE). The plugin folder carries the same block in `alynki-plugin/cursor-mcp.json`, named by `alynki-plugin/.cursor-plugin/plugin.json`, with a root `.cursor-plugin/marketplace.json`, for a Cursor that installs from a plugin source. Cursor's documentation does not say whether it reads `auth` from a plugin's MCP file, so the block above is the setup to rely on. The connector's server instructions tell a new chat to call `load_context` first. More at https://alynki.com/docs/.
+`alynki-cursor` is Alynki's public client for Cursor: it holds no secret, so there is nothing to copy or keep, and every person still signs in as themselves in the browser (OAuth with PKCE). The plugin folder carries the same block in `alynki-plugin/cursor-mcp.json`, named by `alynki-plugin/.cursor-plugin/plugin.json`, with a root `.cursor-plugin/marketplace.json`. A Cursor that installs the plugin needs no hand editing: it reads `auth` from that file (tested on 25 November 2026 from a local plugin folder). The same manifest names `alynki-plugin/hooks/cursor-hooks.json`, whose `sessionStart` and `subagentStart` hooks tell a chat and its subagents to call `load_context` first; without the plugin, the connector's server instructions say the same. If Cursor also imports Claude Code's plugins (Cursor Settings → Agents) and finds a copy of this one older than 0.31.0, that copy has no client ID, takes the server's place and sign-in fails with "does not support dynamic client registration": update the plugin in Claude Code, or turn the import off. More at https://alynki.com/docs/.
 
 ### Grok (Grok Build and grok.com)
 
-**grok.com** (xAI's [connectors page](https://docs.x.ai/grok/connectors)): go to grok.com/connectors and choose New
-Connector, pick Alynki from the catalog, and sign in with your Alynki account.
+**grok.com** (xAI's [connectors page](https://docs.x.ai/grok/connectors)): Alynki is not yet in Grok's connector catalog. Go to
+grok.com/connectors, choose to add a custom connector, enter `https://mcp.alynki.com/mcp`, and sign in with your Alynki account.
 
 **Grok Build** (xAI's [Skills, Plugins & Marketplaces](https://docs.x.ai/build/features/skills-plugins-marketplaces)):
 Grok reaches Alynki as a remote MCP connector at `https://mcp.alynki.com/mcp`; sign in when it first connects. Grok Build's session-start hooks only observe, so the plugin ships no hook for it. Add this one line to the global `~/.grok/AGENTS.md` (not a working-directory file, and not a file Codex also reads):
@@ -161,7 +158,7 @@ ChatGPT has no session-start hook; the connector's server instructions tell a ne
 
 ### Every client
 
-A session starts with `load_context`: the hook (Claude Code, Codex, Antigravity, VS Code and Copilot CLI) tells the session, and in Claude Code every subagent, to call Alynki's `load_context` first, and the server's own instructions say the same everywhere else. The hooks are one script, `alynki-plugin/hooks/session-start.sh`, printing one wording file, `alynki-plugin/hooks/load-first.md`, in each client's output shape. Grok Build has no hook that can inject text, so it ships none: the line in `~/.grok/AGENTS.md` above does it.
+A session starts with `load_context`: the hook (Claude Code, Codex, Cursor, Antigravity, VS Code and Copilot CLI) tells the session, and in Claude Code every subagent, to call Alynki's `load_context` first, and the server's own instructions say the same everywhere else. The hooks are one script, `alynki-plugin/hooks/session-start.sh`, printing one wording file, `alynki-plugin/hooks/load-first.md`, in each client's output shape. Grok Build has no hook that can inject text, so it ships none: the line in `~/.grok/AGENTS.md` above does it.
 
 **To sign in with your own identity**, install and use it; run `/mcp` to sign in when prompted.
 
@@ -241,7 +238,8 @@ Key: diamond, a decision made by the server; rectangle, the surface a session is
   shape (Claude Code: `SessionStart` emits both `initialUserMessage` and `additionalContext`; Codex,
   from its own `hooks/codex-hooks.json`: `SessionStart` emits `additionalContext` only, because Codex drops
   an output carrying a field it does not know; `SubagentStart` emits `additionalContext` in both;
-  Antigravity: an injected `systemMessage`). The text names only `load_context`, which every credential class holds.
+  Antigravity: an injected `systemMessage`; Cursor, from `hooks/cursor-hooks.json`: `additional_context` for
+  `sessionStart` and `subagentStart`). The text names only `load_context`, which every credential class holds.
 
 ## Working a run
 
@@ -364,6 +362,7 @@ including the one setting held in `settings.json` (*What it runs, sends and fetc
 
 ## Release notes
 
+- `alynki` 0.33.0: the root `alynki-plugin/plugin.json` is now an Agent Plugins v1.0.0 manifest, so Copilot CLI and VS Code read the server from `mcp.json` and the hooks from `com.github.copilot/hooks/hooks.json`; `copilot-mcp.json` and `hooks/copilot-hooks.json` are gone. Update the plugin to this version. No tool and no prompt added: 44 tools and 44 prompts. Cursor: the plugin ships its own session-start and subagent-start hooks (`hooks/cursor-hooks.json`) and a logo, and the READMEs no longer say Alynki is listed in the Cursor Marketplace or Grok's connector catalog (alynki/alynki#3656). Antigravity Marketplace: the Antigravity manifest names `assets/logo-padded.png` (outside dot folders) and three starter prompts; `assets/logo.png` is the 512 by 512 listing icon (alynki/alynki#3660).
 - `alynki` 0.32.0: the permission hint moves into the plugin. The Alynki server's instructions no longer name `/alynki:setup` (OpenAI's plugin scanner read it as pointing to another plugin; alynki/alynki#3580); the shared hook text `alynki-plugin/hooks/load-first.md` now says, for each client, how to allow Alynki's tools when `load_context` is refused for permission: Claude Code runs `/alynki:setup`, Antigravity CLI runs `sh bin/setup-antigravity.sh`, Codex CLI and GitHub Copilot allow Alynki in their own tool permissions, and with no user present the session ends. `copilot/mcp-tools.json` and `alynki-plugin.json` carry the server's new texts (the typed trigger `config`, alynki/alynki#3581). No tool and no prompt added: 44 tools and 44 prompts.
   The Copilot agent package is 1.0.10. `copilot/gen-tools.sh` now accepts a server that sends no `Mcp-Session-Id` (a stateless one, such as a local build), so the JSON can be generated from the release before it deploys.
 - `alynki` 0.31.0: Cursor setup. `alynki-plugin/cursor-mcp.json` names `https://mcp.alynki.com/mcp` with `"auth": {"CLIENT_ID": "alynki-cursor"}`, the public client the Alynki auth server pre-registers for Cursor (no secret, PKCE); `alynki-plugin/.cursor-plugin/plugin.json` and a root `.cursor-plugin/marketplace.json` list it, and the Cursor section above shows the same block for a hand setup in `~/.cursor/mcp.json`. The auth server's metadata now lists `none` and `client_secret_basic` as the token endpoint's client authentication methods. No tool and no prompt added: 44 tools and 44 prompts.

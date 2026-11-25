@@ -42,11 +42,11 @@ copilot plugin marketplace add alynki/plugin
 copilot plugin install alynki@alynki-marketplace
 ```
 
-Copilot reads the root `plugin.json` (Copilot format), which names `hooks/copilot-hooks.json` (the `sessionStart` and `subagentStart` hooks) and `copilot-mcp.json` (the same address). Antigravity keeps the fixed root `hooks.json`, so the Copilot hooks sit in their own file. Sign in when the client first connects. Agent hooks in VS Code and Copilot CLI are in preview, and the instruction only runs where your organisation allows plugins and hooks: the VS Code policies `ChatPluginsEnabled`, `ChatAllowManagedHooksOnly` and `ChatStrictMarketplaces` can block either. Without the hook, ask your agent to call `load_context` first.
+Copilot reads the root `plugin.json`, an [Agent Plugins](https://agent-plugins.org/) v1.0.0 manifest, then `mcp.json` (the server's address) and `com.github.copilot/hooks/hooks.json` (the `sessionStart` and `subagentStart` hooks). Sign in when the client first connects. Agent hooks in VS Code and Copilot CLI are in preview, and the instruction only runs where your organisation allows plugins and hooks: the VS Code policies `ChatPluginsEnabled`, `ChatAllowManagedHooksOnly` and `ChatStrictMarketplaces` can block either. Without the hook, ask your agent to call `load_context` first.
 
 ## Cursor
 
-Cursor's [Model Context Protocol (MCP)](https://cursor.com/docs/mcp): go to Customize and open the Cursor Marketplace, find Alynki and choose Add to Cursor, then sign in. For a Cursor where Alynki is not listed, add this to `~/.cursor/mcp.json` (or a project's `.cursor/mcp.json`), then sign in when Cursor first connects to `https://mcp.alynki.com/mcp`:
+Cursor's [Model Context Protocol (MCP)](https://cursor.com/docs/mcp). Alynki is not yet listed in the Cursor Marketplace, so add this to `~/.cursor/mcp.json` (or a project's `.cursor/mcp.json`), then sign in with your Alynki account when Cursor first connects to `https://mcp.alynki.com/mcp`:
 
 ```json
 {
@@ -61,7 +61,7 @@ Cursor's [Model Context Protocol (MCP)](https://cursor.com/docs/mcp): go to Cust
 }
 ```
 
-`alynki-cursor` is Alynki's public client for Cursor: it holds no secret, so there is nothing to copy or keep, and every person still signs in as themselves in the browser (OAuth with PKCE). This folder carries the same block in `cursor-mcp.json`, named by `.cursor-plugin/plugin.json`, for a Cursor that installs from a plugin source. Cursor's documentation does not say whether it reads `auth` from a plugin's MCP file, so the block above is the setup to rely on. The connector's server instructions tell a new chat to call `load_context` first. More at https://alynki.com/docs/.
+`alynki-cursor` is Alynki's public client for Cursor: it holds no secret, so there is nothing to copy or keep, and every person still signs in as themselves in the browser (OAuth with PKCE). This folder carries the same block in `cursor-mcp.json`, named by `.cursor-plugin/plugin.json`. A Cursor that installs the plugin needs no hand editing: it reads `auth` from that file (tested on 25 November 2026 from a local plugin folder). The same manifest names `hooks/cursor-hooks.json`, whose `sessionStart` and `subagentStart` hooks tell a chat and its subagents to call `load_context` first; without the plugin, the connector's server instructions say the same. If Cursor also imports Claude Code's plugins (Cursor Settings → Agents) and finds a copy of this one older than 0.31.0, that copy has no client ID, takes the server's place and sign-in fails with "does not support dynamic client registration": update the plugin in Claude Code, or turn the import off. More at https://alynki.com/docs/.
 
 ## Grok Build
 
@@ -79,7 +79,7 @@ What your business already knows, how you decide, who may do what and what good 
 
 ## What it runs, sends and fetches
 
-Claude Code runs three things from this plugin, and nothing else (Codex and Antigravity run only the hook script, the same way; `bin/setup-antigravity.sh` runs only when you run it and writes only that one settings file):
+Claude Code runs three things from this plugin, and nothing else (Codex, Cursor and Antigravity run only the hook script, the same way; `bin/setup-antigravity.sh` runs only when you run it and writes only that one settings file):
 
 - **Two hooks**, `SessionStart` and `SubagentStart`. Each runs `sh "${CLAUDE_PLUGIN_ROOT}"/hooks/session-start.sh claude <session|subagent>`, which prints the fixed text in `hooks/load-first.md` and tells the session, and every subagent it starts, to call `load_context` first. The text applies even when the user's message asks the model not to use tools, and it says the model may tell the user it loaded the context. The hooks make no network call and read nothing else.
 - **A header helper**, `bin/headers.sh`, which Claude Code runs when it connects, reconnects or meets a 401 or 403 from Alynki. It needs `jq`, reads only the `alynki` entry under `pluginConfigs` in `$CLAUDE_CONFIG_DIR/settings.json` (`~/.claude/settings.json` when that is unset), and prints a JSON object of headers: `Authorization: Bearer <token>` when a pinned token is set, and `X-Alynki-Model: <model>` when the optional model setting is a plain model id. It writes nothing, makes no network call and never prints the model.
