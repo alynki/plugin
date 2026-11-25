@@ -4,14 +4,14 @@
     "sessionStart": [
       {
         "type": "command",
-        "command": "sh ./hooks/session-start.sh copilot session",
+        "command": "sh \"${PLUGIN_ROOT}/hooks/session-start.sh\" copilot session",
         "timeoutSec": 30
       }
     ],
     "subagentStart": [
       {
         "type": "command",
-        "command": "sh ./hooks/session-start.sh copilot subagent",
+        "command": "sh \"${PLUGIN_ROOT}/hooks/session-start.sh\" copilot subagent",
         "timeoutSec": 30
       }
     ]
