@@ -65,7 +65,13 @@ Cursor's [Model Context Protocol (MCP)](https://cursor.com/docs/mcp). Alynki is 
 
 ## Grok Build
 
-xAI's [Skills, Plugins & Marketplaces](https://docs.x.ai/build/features/skills-plugins-marketplaces). Grok Build has no hook that can inject text into a session, so this plugin ships none. Add one line to `~/.grok/AGENTS.md`: call Alynki's `load_context` first.
+xAI's [Skills, Plugins & Marketplaces](https://docs.x.ai/build/features/skills-plugins-marketplaces). Install the repository root, then open `/mcps`, select `alynki` and press `i` to sign in, run `/alynki:setup`, and start a new session:
+
+```bash
+grok plugin install alynki/plugin --trust
+```
+
+The root `.grok-plugin/plugin.json` names this folder's `grok/mcp.json` (the same address, with Alynki's public loopback client), its setup skill and one `PreToolUse` hook. Grok Build has no hook that can inject text into a session; setup writes the load-first wording to `~/.grok/rules/` instead.
 
 ## Setup per client
 
@@ -73,6 +79,7 @@ xAI's [Skills, Plugins & Marketplaces](https://docs.x.ai/build/features/skills-p
 - **Antigravity CLI:** run `/setup` once and approve its one command outside the sandbox. It runs `bin/setup-antigravity.sh` (needs `jq`), which writes to `~/.gemini/antigravity-cli/settings.json` a `mcp(alynki_alynki/<tool>)` rule in `permissions.allow` for the 37 tools in `tools.txt` and in `permissions.ask` for the seven access-changing tools in `ask-tools.txt`, removes any allow rule for those seven, keeps your other entries, and changes nothing on a second run. It names, and leaves for you to remove, any allow rule under the old server name `alynki` (or a wildcard) that lets one of the seven run without asking.
 - **GitHub Copilot CLI:** run `/alynki:setup` once. It runs `bin/setup-copilot.sh`: hooks then allow the 37 tools of `tools.txt` and make the seven of `ask-tools.txt` ask each time; `--undo` reverses it. Limits: the hooks recognise Alynki by the server name `alynki` only, so any server of that name is treated as Alynki's; hooks run only in a folder you have trusted; if the hook script crashes, Copilot denies the call; autopilot treats ask as deny; not on Windows.
 - **Cursor:** run `/alynki-setup` once and approve its one command (needs `jq`). It adds `plugin-alynki-alynki:<tool>` for the 37 tools in `tools.txt` to `mcpAllowlist` in `~/.cursor/permissions.json`, removes this server's entries that cover the seven in `ask-tools.txt`, keeps your other entries, and changes nothing on a second run. The seven ask only in [Run Mode](https://cursor.com/docs/agent/security/run-modes) Allowlist: Auto-review's classifier can run them without asking, and Run Everything runs them. That file's list replaces the MCP allowlist in Cursor Settings.
+- **Grok Build:** run `/alynki:setup` once. It writes the rules for the same 37 and 7 into `~/.grok/config.toml` and writes `~/.grok/rules/alynki-load-context.md`.
 - **Other clients:** no local permission file; see https://alynki.com/docs/.
 
 ## What you can ask
@@ -81,7 +88,7 @@ What your business already knows, how you decide, who may do what and what good 
 
 ## What it runs, sends and fetches
 
-Claude Code runs three things from this plugin, and nothing else (Codex and Antigravity run only the hook script, the same way; Cursor also runs `cursor/ask.sh` before each MCP call, which asks for the seven access-changing tools and reads nothing but the call; `bin/setup-antigravity.sh`, Codex's `codex/setup.sh` and `cursor/setup.sh` run only when you invoke them, and each writes only its one settings file):
+Claude Code runs three things from this plugin, and nothing else (Codex and Antigravity run only the hook script, the same way; Cursor also runs `cursor/ask.sh` before each MCP call, which asks for the seven access-changing tools and reads nothing but the call; `bin/setup-antigravity.sh`, Codex's `codex/setup.sh` and `cursor/setup.sh` run only when you invoke them, and each writes only its one settings file; Grok Build runs `grok/ask.sh` before each of the seven access-changing tools, which reads the call and prints ask or deny, and `grok/setup.sh` only when you invoke setup):
 
 - **Two hooks**, `SessionStart` and `SubagentStart`. Each runs `sh "${CLAUDE_PLUGIN_ROOT}"/hooks/session-start.sh claude <session|subagent>`, which prints the fixed text in `hooks/load-first.md` and tells the session, and every subagent it starts, to call `load_context` first. The text applies even when the user's message asks the model not to use tools, and it says the model may tell the user it loaded the context. The hooks make no network call and read nothing else.
 - **A header helper**, `bin/headers.sh`, which Claude Code runs when it connects, reconnects or meets a 401 or 403 from Alynki. It needs `jq`, reads only the `alynki` entry under `pluginConfigs` in `$CLAUDE_CONFIG_DIR/settings.json` (`~/.claude/settings.json` when that is unset), and prints a JSON object of headers: `Authorization: Bearer <token>` when a pinned token is set, and `X-Alynki-Model: <model>` when the optional model setting is a plain model id. It writes nothing, makes no network call and never prints the model.

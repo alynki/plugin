@@ -143,11 +143,12 @@ Cursor's [Model Context Protocol (MCP)](https://cursor.com/docs/mcp). Alynki is 
 grok.com/connectors, choose to add a custom connector, enter `https://mcp.alynki.com/mcp`, and sign in with your Alynki account.
 
 **Grok Build** (xAI's [Skills, Plugins & Marketplaces](https://docs.x.ai/build/features/skills-plugins-marketplaces)):
-Grok reaches Alynki as a remote MCP connector at `https://mcp.alynki.com/mcp`; sign in when it first connects. Grok Build's session-start hooks only observe, so the plugin ships no hook for it. Add this one line to the global `~/.grok/AGENTS.md` (not a working-directory file, and not a file Codex also reads):
 
-```text
-Before anything else in every session and subagent, call Alynki's load_context, and page it to completion.
+```bash
+grok plugin install alynki/plugin --trust
 ```
+
+Install the repository root, not `#alynki-plugin`: Grok then reads `.grok-plugin/plugin.json`, which adds the connection to `https://mcp.alynki.com/mcp`, the setup skill and one hook. To sign in, open `/mcps`, expand the Alynki plugin, select `alynki` and press `i`; your browser opens Alynki's sign-in (Alynki's public loopback client, named in `grok/mcp.json`: PKCE, no secret; Grok does not use client-ID metadata documents, and without a client ID it asks for dynamic registration, which Alynki does not offer). Then run `/alynki:setup` and start a new session. If your grok.com account also has an Alynki connector, Grok Build loads that hosted copy too, and setup's rules do not cover it.
 
 grok.com reads the connector's server instructions, which already name `load_context` first.
 
@@ -161,7 +162,7 @@ ChatGPT has no session-start hook; the connector's server instructions tell a ne
 
 ### Every client
 
-A session starts with `load_context`: the hook (Claude Code, Codex, Cursor, Antigravity, VS Code and Copilot CLI) tells the session, and in Claude Code every subagent, to call Alynki's `load_context` first, and the server's own instructions say the same everywhere else. The hooks are one script, `alynki-plugin/hooks/session-start.sh`, printing one wording file, `alynki-plugin/hooks/load-first.md`, in each client's output shape. Grok Build has no hook that can inject text, so it ships none: the line in `~/.grok/AGENTS.md` above does it.
+A session starts with `load_context`: the hook (Claude Code, Codex, Cursor, Antigravity, VS Code and Copilot CLI) tells the session, and in Claude Code every subagent, to call Alynki's `load_context` first, and the server's own instructions say the same everywhere else. The hooks are one script, `alynki-plugin/hooks/session-start.sh`, printing one wording file, `alynki-plugin/hooks/load-first.md`, in each client's output shape. Grok Build has no hook that can inject text: before setup the server's instructions tell it, and `/alynki:setup` writes the same wording to `~/.grok/rules/`.
 
 **To sign in with your own identity**, install and use it; run `/mcp` to sign in when prompted.
 
@@ -359,6 +360,7 @@ entries:
 | GitHub Copilot CLI | `/alynki:setup`. It runs `bin/setup-copilot.sh`, which writes a marker in `$COPILOT_HOME` (default `~/.copilot`); a `permissionRequest` hook then allows the 37 tools of `tools.txt`, and a `preToolUse` hook makes the seven of `ask-tools.txt` ask each time. Nothing is allowed before setup; a second run changes nothing; `--undo` makes Copilot ask again. Limits: the hooks recognise Alynki by the server name `alynki` only, so any server of that name is treated as Alynki's; hooks run only in a folder you have trusted; if the hook script crashes, Copilot denies the call; autopilot treats ask as deny; not on Windows. |
 | Cursor | `/alynki-setup` ([Cursor skill names](https://cursor.com/docs/skills) allow no colon). It runs `alynki-plugin/cursor/setup.sh` (needs `jq`; approve the command), which merges `plugin-alynki-alynki:<tool>` for the 37 tools in `tools.txt` into `mcpAllowlist` of `~/.cursor/permissions.json` ([permissions.json](https://cursor.com/docs/reference/permissions)) and removes this server's entries covering the seven in `ask-tools.txt`; a second run changes nothing. Cursor has no ask list: the seven ask only in [Run Mode](https://cursor.com/docs/agent/security/run-modes) Allowlist. In Auto-review Cursor's classifier can run them without asking, and Run Everything runs them. The file's list replaces the MCP allowlist in Cursor Settings. |
 | VS Code | No local permission file is written here; approve per your client's own prompt. |
+| Grok Build | `/alynki:setup` (approve its one command). It runs `alynki-plugin/grok/setup.sh`, which writes into `$GROK_HOME` (`~/.grok`): in `config.toml`, a [permission rule](https://docs.x.ai/build/features/permissions) allowing each tool in `tools.txt` and one asking for each in `ask-tools.txt`; and `rules/alynki-load-context.md`. Alynki's pages fit Grok's default 20,000-byte result limit, so setup leaves `max_output_bytes` as it is. It keeps your other entries, changes nothing on a second run, and `--undo` removes it. Limits: the rules match any server named `alynki`; the plugin's hook, which makes the seven ask over a saved "Always allow" and refuses them in always-approve mode, runs only in a trusted folder; in a headless always-approve run an asking hook is answered by Grok itself, so the hook refuses there. |
 | ChatGPT, Microsoft 365 Copilot, grok.com | Approval is set in the product, not on this machine; see the documentation page at https://alynki.com/docs/. |
 
 ## What the plugin runs, sends and fetches

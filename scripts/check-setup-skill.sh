@@ -125,6 +125,7 @@ marketplace_lists_alynki_only() { [ "$(jq -r '[.plugins[].name] | join(",")' .cl
 variant_directory_gone() { [ ! -e "alynki-${S}ed-plugin" ]; }
 readme_names_it_only_in_the_note() { ! grep -v -F -- "$NOTE" README.md | grep -qiE -- "$GONE"; }
 note_names_the_commit() { grep -F -- "$NOTE" README.md | grep -qE '[0-9a-f]{40}'; }
+# Grok Build signs in with its own client, alynki-grok (alynki/alynki#3685, #3690), so no line may name alynki-local.
 plugin_folder_names_it_nowhere() { ! grep -rqiE --exclude-dir=.git -- "$GONE" alynki-plugin .claude-plugin; }
 ok "the marketplace lists alynki alone" marketplace_lists_alynki_only
 ok "the sealed variant's directory is gone from main" variant_directory_gone
@@ -245,7 +246,6 @@ copilot_output_has_the_wording() {
     .additionalContext + "\n" == ($w | swap)' >/dev/null
 }
 unknown_shape_refused() { ! sh alynki-plugin/hooks/session-start.sh nope session </dev/null >/dev/null 2>&1; }
-no_grok_hook() { [ ! -e alynki-plugin/.grok-plugin ]; }
 # shellcheck disable=SC2016 # the backticks are literal Markdown
 readmes_cover_the_clients() {
   local f
@@ -278,7 +278,6 @@ ok "session-start.sh antigravity prints the wording as an injected systemMessage
 ok "the Antigravity hooks.json command prints the script's output (run from the plugin root)" antigravity_hook_runs_the_script
 ok "session-start.sh copilot prints the wording as top-level additionalContext" copilot_output_has_the_wording
 ok "session-start.sh refuses an unknown shape" unknown_shape_refused
-ok "no Grok hook ships (Grok Build session hooks cannot inject)" no_grok_hook
 ok "both READMEs cover Codex CLI (its own hook file, the one-time trust, the marketplace install), Antigravity CLI and load_context" readmes_cover_the_clients
 
 # Codex gets its own hook file (alynki/alynki#3442): Codex drops a SessionStart output carrying initialUserMessage.
@@ -767,6 +766,92 @@ cursor_says_run_mode_allowlist() {
 }
 ok "Cursor: setup's message and both READMEs say the seven ask only in Run Mode Allowlist (#3686)" cursor_says_run_mode_allowlist
 ok "the Cursor beforeMCPExecution hook answers ask for the seven of Alynki's server and nothing else" cursor_hook_asks_for_the_seven_only
+
+# Grok Build (alynki/alynki#3685). It installs the repository root: a root plugin.json in the installed folder wins over
+# .grok-plugin/plugin.json (Grok 1.0.92), and alynki-plugin/ has one.
+GROK=.grok-plugin/plugin.json
+GROKDIR=alynki-plugin/grok
+grok_manifest() {
+  [ ! -e plugin.json ] && [ "$(jq -r .name "$GROK")" = alynki ] && [ "$(jq -r .version "$GROK")" = "$(jq -r .version "$STD")" ] &&
+    [ -f "$(jq -r .skills "$GROK")setup/SKILL.md" ] && [ -f "$(jq -r .mcpServers "$GROK")" ] && [ -f "$(jq -r .hooks "$GROK")" ]
+}
+grok_marketplace_installs_the_root() {
+  jq -e '.name == "alynki-marketplace" and [.plugins[].name] == ["alynki"] and .plugins[0].source == {"source": "url", "url": "https://github.com/alynki/plugin.git"}' .grok-plugin/marketplace.json >/dev/null
+}
+grok_server_and_client() { jq -e --arg u "$MCP_URL" '.mcpServers.alynki | .url == $u and .oauth.clientId == "alynki-grok"' "$GROKDIR/mcp.json" >/dev/null; }
+grok_hook_matches_the_asking_tools() {
+  [ "$(jq -r '.hooks | keys | join(",")' "$GROKDIR/hooks.json")" = PreToolUse ] && jq -e '.hooks.PreToolUse[0].hooks[0].failClosed' "$GROKDIR/hooks.json" >/dev/null &&
+    [ "$(jq -r '.hooks.PreToolUse[0].matcher' "$GROKDIR/hooks.json")" = "^($(sed 's/^/alynki__/' "$ASKLIST" | paste -sd'|' -))\$" ]
+}
+grok_hook_decision() { printf '%s' "$1" | CLAUDE_PLUGIN_ROOT='' GROK_PLUGIN_ROOT=$PWD sh -c "$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$GROKDIR/hooks.json")" | jq -r .decision; }
+grok_hook_asks() { [ "$(grok_hook_decision '{"permissionMode":"default"}')" = ask ] && [ "$(grok_hook_decision '{"permissionMode": "auto"}')" = ask ]; }
+grok_hook_refuses_in_always_approve() { [ "$(grok_hook_decision '{"permissionMode":"bypassPermissions"}')" = deny ]; }
+# grok_run <home> [args]: setup.sh against that folder as GROK_HOME.
+grok_run() {
+  local h=$1
+  shift
+  GROK_HOME=$h sh "$GROKDIR/setup.sh" "$@" >/dev/null
+}
+# grok_rules <config> <action>: the sorted tool names of that action's [[permission.rules]] entries.
+grok_rules() { awk -F'"' -v a="$2" '/^action = / { act = $2 } /^pattern = "alynki__/ && act == a { sub(/^alynki__/, "", $2); print $2 }' "$1" | sort; }
+grok_setup_writes_the_lists() {
+  local d
+  d=$(mktemp -d) && grok_run "$d" && [ "$(grok_rules "$d/config.toml" allow)" = "$(sort "$LIST")" ] && [ "$(grok_rules "$d/config.toml" ask)" = "$(sort "$ASKLIST")" ] &&
+    [ "$(head -c "$(wc -c <alynki-plugin/hooks/load-first.md)" "$d/rules/alynki-load-context.md")" = "$(cat alynki-plugin/hooks/load-first.md)" ]
+}
+grok_second_run_changes_nothing() {
+  local d
+  d=$(mktemp -d) && grok_run "$d" && cp "$d/config.toml" "$d/first" && grok_run "$d" && cmp -s "$d/first" "$d/config.toml" &&
+    grep -v '^#' "$d/first" >"$d/config.toml" && cp "$d/config.toml" "$d/rewritten" && grok_run "$d" && cmp -s "$d/rewritten" "$d/config.toml"
+}
+grok_keeps_the_users_entries() {
+  local d
+  d=$(mktemp -d) || return 1
+  printf '[ui]\nx = 1\n\n[[permission.rules]]\naction = "deny"\ntool = "mcp"\npattern = "alynki__delete_run"\n\n[[permission.rules]]\naction = "allow"\ntool = "mcp"\npattern = "alynki__grant_principal"\n\n[[permission.rules]]\naction = "allow"\ntool = "bash"\npattern = "git *"\n' >"$d/config.toml"
+  grok_run "$d" && grep -qx 'x = 1' "$d/config.toml" && grep -qx 'pattern = "git \*"' "$d/config.toml" &&
+    [ "$(grok_rules "$d/config.toml" deny)" = delete_run ] && [ "$(grok_rules "$d/config.toml" allow)" = "$(sort "$LIST")" ]
+}
+grok_refuses_what_it_cannot_edit() {
+  local d text
+  for text in 'x = """\n"""' 'permission = { deny = [] }' '[permission]\nrules = []' '[permission.rules]'; do
+    d=$(mktemp -d) || return 1
+    # shellcheck disable=SC2059 # the text holds the newlines
+    printf "$text\n" >"$d/config.toml" && cp "$d/config.toml" "$d/was" || return 1
+    if grok_run "$d" 2>/dev/null; then return 1; fi
+    cmp -s "$d/was" "$d/config.toml" && [ ! -e "$d/rules/alynki-load-context.md" ] || return 1
+  done
+}
+# Grok's MCP result limit applies to every server, and an Alynki page fits its 20,000-byte default (alynki/alynki#3672): setup
+# adds no max_output_bytes and keeps one the person set.
+grok_output_limit() {
+  local d
+  d=$(mktemp -d) && printf '[mcp]\nfoo = 1\n' >"$d/config.toml" && grok_run "$d" && [ "$(grep -c '^\[mcp\]' "$d/config.toml")" -eq 1 ] && ! grep -q max_output_bytes "$d/config.toml" &&
+    d=$(mktemp -d) && grok_run "$d" && ! grep -q max_output_bytes "$d/config.toml" && ! grok_run "$d" | grep -qF max_output_bytes &&
+    d=$(mktemp -d) && printf '[mcp]\nmax_output_bytes = 90000\n' >"$d/config.toml" && grok_run "$d" && [ "$(grep -c max_output_bytes "$d/config.toml")" -eq 1 ] && grep -qx 'max_output_bytes = 90000' "$d/config.toml"
+}
+grok_undo() {
+  local d
+  d=$(mktemp -d) && printf '[ui]\nx = 1\n' >"$d/config.toml" && grok_run "$d" && grok_run "$d" --undo && ! grep -q -e alynki__ -e max_output_bytes "$d/config.toml" && grep -qx 'x = 1' "$d/config.toml" && [ ! -e "$d/rules/alynki-load-context.md" ]
+}
+grok_skill_is_user_invoked() { grep -qx 'disable-model-invocation: true' "$GROKDIR/skills/setup/SKILL.md" && grep -qF '${GROK_PLUGIN_ROOT}/alynki-plugin/grok/setup.sh' "$GROKDIR/skills/setup/SKILL.md"; }
+readmes_cover_grok() {
+  local f
+  for f in README.md "$PLUGIN_README"; do grep -qF 'grok plugin install alynki/plugin --trust' "$f" && ! grep -qF 'max_output_bytes = 40000' "$f" && ! grep -qF 'to 40000' "$f" || return 1; done
+}
+ok "the Grok manifest at the root carries the version and names files that exist" grok_manifest
+ok "the Grok marketplace file installs the repository root" grok_marketplace_installs_the_root
+ok "Grok connects to the one address with its own client, alynki-grok (#3685)" grok_server_and_client
+ok "the Grok hook is PreToolUse alone, fails closed and matches exactly ask-tools.txt" grok_hook_matches_the_asking_tools
+ok "the Grok hook asks in default and auto mode" grok_hook_asks
+ok "the Grok hook refuses in always-approve mode" grok_hook_refuses_in_always_approve
+ok "Grok setup allows tools.txt, asks for ask-tools.txt and writes the load-first rule" grok_setup_writes_the_lists
+ok "Grok setup changes nothing on a second run, also after Grok drops comments" grok_second_run_changes_nothing
+ok "Grok setup keeps the user's rules and replaces an allow on an asking tool" grok_keeps_the_users_entries
+ok "Grok setup writes nothing into a config it cannot edit safely" grok_refuses_what_it_cannot_edit
+ok "Grok setup adds no output limit and keeps the user's own (#3685, once #3672 is live)" grok_output_limit
+ok "Grok setup --undo removes what it wrote and nothing else" grok_undo
+ok "the Grok setup skill runs only when the user invokes it" grok_skill_is_user_invoked
+ok "both READMEs give the Grok install command and no longer raise the output limit" readmes_cover_grok
 
 echo "$n assertions, $failed failed"
 [ "$failed" -eq 0 ] || exit 1
