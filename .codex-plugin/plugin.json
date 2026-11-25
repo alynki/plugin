@@ -19,5 +19,5 @@
     "privacyPolicyURL": "https://alynki.com/privacy/",
     "logo": "./alynki-plugin/.claude-plugin/icon.png"
   },
-  "skills": "./alynki-plugin/skills/"
+  "skills": "./alynki-plugin/codex/skills/"
 }

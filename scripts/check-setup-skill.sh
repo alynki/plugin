@@ -173,9 +173,9 @@ ok "the README says each step output and check evaluation is saved with a reason
 # (founder option B, 2026-11-15: any change to it is the founder's decision, so its hashes are pinned), the folder has its own LICENSE.
 HOOKS=alynki-plugin/hooks/hooks.json
 # The hook text now lives in hooks/load-first.md; the pins are the hashes of what `session-start.sh claude` prints. They changed once since #3148,
-# for the permission hint (alynki/alynki#3582), which the founder asked for.
-SESSION_START_SHA256=9146b1446215ecffbf5253af038fa9fbc7fec7e2a12e896c0c5f75956a2fc945
-SUBAGENT_START_SHA256=c791e9dd014a4a49a172438bc51499997954c0c2bb06c1ae1b26b86d547eae1e
+# for the permission hint (alynki/alynki#3582), which the founder asked for, and for its Codex sentence (alynki/alynki#3487, asked 2026-11-25).
+SESSION_START_SHA256=4c3761f274bc42dead3d85735841a20fb1706726490a4d78b921407fa7bad927
+SUBAGENT_START_SHA256=2a464b37a79aee9b362078a66b2a93dae607417f811cc42dad69abab666ddc7a
 sha_of() { { sha256sum "$1" 2>/dev/null || shasum -a 256 "$1"; } | cut -d' ' -f1; }
 # shellcheck disable=SC2016 # ${CLAUDE_PLUGIN_ROOT} is literal text in the hook command
 hook_commands_use_plugin_root() {
@@ -320,6 +320,42 @@ codex_installs_a_plugin_with_hooks() {
 codex_marketplace_matches() { [ "$(jq -r .name .agents/plugins/marketplace.json)" = "$(jq -r .name .claude-plugin/marketplace.json)" ]; }
 ok "the folder Codex installs has no root Agent Plugins plugin.json, and its Codex manifest names files that exist" codex_installs_a_plugin_with_hooks
 ok "the Codex marketplace carries the Claude marketplace's name" codex_marketplace_matches
+
+# Codex's own setup: a skill and script apart from Claude's; it approves every tool of this plugin's server.
+CODEXSET=alynki-plugin/codex/setup.sh
+SEVEN_ASK="create_principal_agent grant_principal invite_principal revoke_principal revoke_principal_agent revoke_principal_invite update_principal_agent"
+codex_manifest_names_its_skill() { [ "$(jq -r .skills "$CODEX")" = ./alynki-plugin/codex/skills/ ] && grep -qx 'name: setup' alynki-plugin/codex/skills/setup/SKILL.md && grep -qF 'setup.sh' alynki-plugin/codex/skills/setup/SKILL.md; }
+# A temporary CODEX_HOME with other settings, a server default of approve and an allow rule on one of the seven:
+# the 37 are approve, the seven prompt, the default is gone, the rest is kept, and a second run is byte-identical.
+codex_mode() { awk -v h="[plugins.\"alynki@alynki-marketplace\".mcp_servers.alynki.tools.$2]" '$0 == h { getline; print; exit }' "$1"; }
+codex_setup_idempotent() {
+  local h f t ok=1 p='plugins."alynki@alynki-marketplace"'
+  h=$(mktemp -d) || return 1
+  f=$h/config.toml
+  printf 'model = "m"\n[%s]\nenabled = true\n[%s.mcp_servers.alynki]\ndefault_tools_approval_mode = "approve"\n[%s.mcp_servers.alynki.tools.grant_principal]\napproval_mode = "approve"\n[%s.mcp_servers.alynki.tools."load_run"]\napproval_mode = "prompt"\noutput_token_limit = 9\n[mcp_servers.other]\ndefault_tools_approval_mode = "approve"\n' "$p" "$p" "$p" "$p" >"$f"
+  CODEX_HOME=$h sh "$CODEXSET" >/dev/null && cp "$f" "$h/first" && CODEX_HOME=$h sh "$CODEXSET" >/dev/null && cmp -s "$h/first" "$f" &&
+    [ "$(grep -c '^approval_mode = "approve"$' "$f")" -eq 37 ] && [ "$(grep -c '^approval_mode = "prompt"$' "$f")" -eq 7 ] &&
+    [ "$(grep -c '^default_tools_approval_mode = "approve"$' "$f")" -eq 1 ] &&
+    [ "$(grep -A1 -F 'tools."load_run"]' "$f" | tail -n1)" = 'approval_mode = "approve"' ] &&
+    grep -qx 'output_token_limit = 9' "$f" && grep -qx 'model = "m"' "$f" || ok=0
+  for t in $SEVEN_ASK; do [ "$(codex_mode "$f" "$t")" = 'approval_mode = "prompt"' ] || ok=0; done
+  rm -rf "$h"
+  [ "$ok" -eq 1 ]
+}
+codex_setup_refuses() {
+  local h ok=1 body
+  h=$(mktemp -d) || return 1
+  for body in '[plugins."alynki@alynki-marketplace"]\nmcp_servers = {}\n' "[plugins.'alynki@alynki-marketplace']\n" '[plugins."alynki@alynki-marketplace"]\nx = """\n"""\n' '[mcp_servers.other]\n'; do
+    printf '%b' "$body" >"$h/config.toml"; cp "$h/config.toml" "$h/before"
+    if CODEX_HOME=$h sh "$CODEXSET" >/dev/null 2>&1; then ok=0; fi
+    cmp -s "$h/before" "$h/config.toml" || ok=0
+  done
+  rm -rf "$h"
+  [ "$ok" -eq 1 ]
+}
+ok "the Codex manifest names Codex's own setup skill, which runs setup.sh" codex_manifest_names_its_skill
+ok "Codex setup allows the 37, makes the seven ask, keeps the rest, and a second run changes nothing" codex_setup_idempotent
+ok "Codex setup writes nothing to a config it cannot edit safely, or without the plugin" codex_setup_refuses
 ok "the standard plugin's version is at least 0.33.1, the release of the Codex root layout" version_at_least "$STD" 0.33.1
 ok "the standard plugin's version is at least 0.29.1, the release of the Codex hook file" version_at_least "$STD" 0.29.1
 ok "the Codex manifest names hooks/codex-hooks.json, which exists" codex_manifest_names_its_hooks
@@ -595,7 +631,7 @@ hint_in() { # <shape> <event>: the printed output, once decoded, holds the whole
   printf '%s' "$out" | grep -qF 'If load_context is refused for permission, do not retry.' &&
     printf '%s' "$out" | grep -qF 'In Claude Code: run /alynki:setup, which allows '"$(grep -c . "$LIST")"' of Alynki' &&
     printf '%s' "$out" | grep -qF 'In Antigravity CLI: run sh bin/setup-antigravity.sh' &&
-    printf '%s' "$out" | grep -qF 'In Codex CLI and in GitHub Copilot (VS Code or CLI): allow Alynki' &&
+    printf '%s' "$out" | grep -qF 'In Codex CLI: run $alynki:setup' &&
     printf '%s' "$out" | grep -qF 'If no user is present, end the session.'
 }
 ok "the Claude hook output (session and subagent) carries the permission hint: /alynki:setup, the 37 tools of tools.txt" bash -c "$(declare -f hint_in); LIST=$LIST; hint_in claude session && hint_in claude subagent"

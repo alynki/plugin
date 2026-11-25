@@ -355,7 +355,8 @@ entries:
 |---|---|
 | Claude Code | `/alynki:setup`, above. |
 | Antigravity CLI | `sh alynki-plugin/bin/setup-antigravity.sh` from a clone. It merges `mcp(alynki/<tool>)` rules for the 37 tools in `tools.txt` into `permissions.allow` of `~/.gemini/antigravity-cli/settings.json` and removes any allow rule for the seven in `ask-tools.txt`, so Antigravity asks before each of those; it keeps every other entry, and a second run changes nothing. Needs `jq`. Antigravity documents `mcp(server/*)` and `mcp(*)` wildcards too; the script writes the explicit list. |
-| Codex CLI, Cursor, VS Code, GitHub Copilot CLI | No local permission file is written here; approve per your client's own prompt. |
+| Codex CLI | `$alynki:setup` ([how Codex skills are invoked](https://learn.chatgpt.com/docs/build-skills)). The same grant as Claude Code's: it runs `alynki-plugin/codex/setup.sh`, which writes the plugin's tool policy into `$CODEX_HOME/config.toml` ([Plugin-provided MCP servers](https://learn.chatgpt.com/docs/extend/mcp)), `approve` for each tool in `tools.txt` and `prompt` for each in `ask-tools.txt`, replacing any `approve` already there for those seven. Codex asks once to let the script write that file; a second run changes nothing. Hook trust stays yours. |
+| Cursor, VS Code, GitHub Copilot CLI | No local permission file is written here; approve per your client's own prompt. |
 | ChatGPT, Microsoft 365 Copilot, grok.com | Approval is set in the product, not on this machine; see the documentation page at https://alynki.com/docs/. |
 
 ## What the plugin runs, sends and fetches
