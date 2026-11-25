@@ -239,7 +239,10 @@ antigravity_hook_runs_the_script() {
   out=$(cd alynki-plugin && sh -c "$(jq -r '.["alynki-load-first"].SessionStart[0].command' hooks.json)" </dev/null) && [ "$out" = "$(sh alynki-plugin/hooks/session-start.sh antigravity session </dev/null)" ]
 }
 copilot_output_has_the_wording() {
-  sh alynki-plugin/hooks/session-start.sh copilot session </dev/null | jq -e --rawfile w alynki-plugin/hooks/load-first.md '.additionalContext + "\n" == $w' >/dev/null
+  sh alynki-plugin/hooks/session-start.sh copilot session </dev/null | jq -e --rawfile w alynki-plugin/hooks/load-first.md '
+    # The one sentence Copilot is given differently (alynki/alynki#3487).
+    def swap: split("In GitHub Copilot (VS Code or CLI): allow") | join("In GitHub Copilot CLI: run /alynki:setup, which allows 37 of Alynki\u0027s tools once for this machine. In GitHub Copilot in VS Code: allow");
+    .additionalContext + "\n" == ($w | swap)' >/dev/null
 }
 unknown_shape_refused() { ! sh alynki-plugin/hooks/session-start.sh nope session </dev/null >/dev/null 2>&1; }
 no_grok_hook() { [ ! -e alynki-plugin/.grok-plugin ]; }
@@ -381,7 +384,7 @@ copilot_manifest_is_agent_plugins() {
 }
 copilot_old_files_are_gone() { [ -s "$COPHOOKS" ] && [ ! -e alynki-plugin/hooks/copilot-hooks.json ] && [ ! -e alynki-plugin/copilot-mcp.json ]; }
 copilot_hooks_are_flat_version_1() {
-  jq -e '.version == 1 and (.hooks | keys | sort) == ["sessionStart","subagentStart"] and ([.hooks[][] | has("hooks") | not] | all) and ([.hooks[][] | .type == "command" and (.timeoutSec | type == "number")] | all)' "$COPHOOKS" >/dev/null
+  jq -e '.version == 1 and (.hooks | keys | sort) == ["permissionRequest","preToolUse","sessionStart","subagentStart"] and ([.hooks[][] | has("hooks") | not] | all) and ([.hooks[][] | .type == "command" and (.timeoutSec | type == "number")] | all)' "$COPHOOKS" >/dev/null
 }
 # shellcheck disable=SC2016 # ${PLUGIN_ROOT} is literal text in the hook command
 copilot_hooks_use_the_shared_script() {
@@ -410,7 +413,7 @@ antigravity_hooks_are_named_groups() {
 ok "the Copilot root plugin.json carries the Claude manifest's name and version" copilot_manifest_matches
 ok "the root plugin.json is an Agent Plugins v1.0.0 manifest: the schema, no field outside the specification, MIT" copilot_manifest_is_agent_plugins
 ok "the Copilot hooks sit at com.github.copilot/hooks/hooks.json, and copilot-hooks.json and copilot-mcp.json are gone" copilot_old_files_are_gone
-ok "the Copilot hooks file is version 1, flat, with sessionStart and subagentStart command entries and a timeout" copilot_hooks_are_flat_version_1
+ok "the Copilot hooks file is version 1, flat, with sessionStart, subagentStart, permissionRequest and preToolUse command entries and a timeout" copilot_hooks_are_flat_version_1
 ok "the Copilot hooks run the shared script with the copilot shape (sh \"\${PLUGIN_ROOT}/hooks/session-start.sh\" copilot session|subagent)" copilot_hooks_use_the_shared_script
 ok "the Copilot hook commands print the script's output (run from outside the plugin, PLUGIN_ROOT set)" copilot_hook_commands_print_the_output
 ok "session-start.sh copilot prints exactly one top-level key, additionalContext, for both events" copilot_output_is_exactly_additional_context
@@ -660,9 +663,55 @@ ok "the Claude hook output (session and subagent) carries the permission hint: /
 ok "the Codex hook output (session and subagent) carries the permission hint" bash -c "$(declare -f hint_in); LIST=$LIST; hint_in codex session && hint_in codex subagent"
 ok "the Antigravity session output carries the permission hint (/setup)" bash -c "$(declare -f hint_in); LIST=$LIST; hint_in antigravity session"
 ok "the Copilot hook output (session and subagent) carries the permission hint" bash -c "$(declare -f hint_in); LIST=$LIST; hint_in copilot session && hint_in copilot subagent"
+ok "Copilot's hint alone names /alynki:setup for GitHub Copilot CLI" bash -c "h='In GitHub Copilot CLI: run /alynki:setup, which allows $(grep -c . "$LIST") of Alynki'; sh alynki-plugin/hooks/session-start.sh copilot session </dev/null | grep -qF \"\$h\" && sh alynki-plugin/hooks/session-start.sh copilot subagent </dev/null | grep -qF \"\$h\" && ! sh alynki-plugin/hooks/session-start.sh codex session </dev/null | grep -qF 'In GitHub Copilot CLI:'"
 ok "the standard plugin's version is at least 0.32.0, the release of the permission hint" version_at_least "$STD" 0.32.0
 ok "the standard plugin's version is at least 0.33.0, the release of the Agent Plugins manifest" version_at_least "$STD" 0.33.0
 ok "the hint's setup script exists and is the one the READMEs name" bash -c 'test -f alynki-plugin/bin/setup-antigravity.sh && grep -qF "bin/setup-antigravity.sh" alynki-plugin/skills/setup/antigravity.md && grep -qF setup-antigravity.sh alynki-plugin/README.md'
+
+# GitHub Copilot setup (alynki/alynki#3487): /alynki:setup writes a marker; a permissionRequest hook then allows every Alynki tool.
+CPA=alynki-plugin/com.github.copilot/hooks/allow-tools.sh
+CPS=alynki-plugin/bin/setup-copilot.sh
+# cp_ask <home> <toolName> [toolInput]: the hook's stdout for one permission request, shaped as Copilot CLI 1.0.115 sends it.
+cp_ask() {
+  printf '{"hookName":"permissionRequest","cwd":"/x","toolName":"%s","toolInput":%s,"permissionSuggestions":[]}' "$2" "${3:-{\}}" | COPILOT_HOME=$1 sh "$CPA"
+}
+copilot_asks_before_setup() { local d; d=$(mktemp -d); [ -z "$(cp_ask "$d" alynki/load_context)" ]; }
+copilot_allows_every_tool_after_setup() {
+  local d t; d=$(mktemp -d); COPILOT_HOME=$d sh "$CPS" >/dev/null || return 1
+  for t in $(cat "$LIST"); do [ "$(cp_ask "$d" "alynki/$t")" = '{"behavior":"allow"}' ] || return 1; done
+  for t in $(cat "$ASKLIST"); do [ -z "$(cp_ask "$d" "alynki/$t")" ] || return 1; done
+}
+# cp_pre <toolName>: the preToolUse hook's decision for one call.
+cp_pre() { printf '{"cwd":"/x","toolName":"%s","toolArgs":{}}' "$1" | sh "$CPA" ask | jq -r '.permissionDecision // empty'; }
+copilot_seven_always_ask() {
+  local t
+  for t in $(cat "$ASKLIST"); do [ "$(cp_pre "alynki-$t")" = ask ] || return 1; done
+  for t in $(cat "$LIST") ; do [ -z "$(cp_pre "alynki-$t")" ] || return 1; done
+  [ -z "$(cp_pre bash)" ]
+}
+copilot_allows_nothing_else() {
+  local d t; d=$(mktemp -d); COPILOT_HOME=$d sh "$CPS" >/dev/null || return 1
+  for t in bash alynki/not_a_tool alynki-x/load_context other/load_context; do [ -z "$(cp_ask "$d" "$t")" ] || return 1; done
+  [ -z "$(cp_ask "$d" bash '{"toolName":"alynki/load_context"}')" ]
+}
+copilot_second_setup_changes_nothing() {
+  local d a; d=$(mktemp -d); COPILOT_HOME=$d sh "$CPS" >/dev/null || return 1
+  a=$(ls -lT "$d" 2>/dev/null || ls -l --full-time "$d")
+  sleep 1
+  COPILOT_HOME=$d sh "$CPS" | grep -q 'nothing changed' && [ "$a" = "$(ls -lT "$d" 2>/dev/null || ls -l --full-time "$d")" ]
+}
+copilot_undo_asks_again() { local d; d=$(mktemp -d); COPILOT_HOME=$d sh "$CPS" >/dev/null && COPILOT_HOME=$d sh "$CPS" --undo >/dev/null && [ -z "$(cp_ask "$d" alynki/load_context)" ]; }
+copilot_permission_hook_is_declared() {
+  jq -e '(.hooks.preToolUse | length == 1 and .[0].matcher == "alynki-.*" and (.[0].command | endswith("allow-tools.sh\" ask"))) and (.hooks.permissionRequest | length == 1 and .[0].matcher == "alynki/.*" and (.[0].command | contains("com.github.copilot/hooks/allow-tools.sh")))' alynki-plugin/com.github.copilot/hooks/hooks.json
+}
+ok "Copilot: nothing is allowed before setup" copilot_asks_before_setup
+ok "Copilot: after setup every tool of tools.txt is allowed and none of ask-tools.txt" copilot_allows_every_tool_after_setup
+ok "Copilot: preToolUse makes every tool of ask-tools.txt ask, and no other" copilot_seven_always_ask
+ok "Copilot: after setup no other server, tool or argument-borne name is allowed" copilot_allows_nothing_else
+ok "Copilot: a second setup changes nothing" copilot_second_setup_changes_nothing
+ok "Copilot: --undo asks again" copilot_undo_asks_again
+ok "Copilot: the permissionRequest hook is declared for the alynki server only" copilot_permission_hook_is_declared
+ok "Copilot: the setup skill sends Copilot to bin/setup-copilot.sh" grep -qF 'bin/setup-copilot.sh' "$SKILL"
 
 echo "$n assertions, $failed failed"
 [ "$failed" -eq 0 ] || exit 1

@@ -7,6 +7,22 @@ description: Allow 37 Alynki MCP tools without a prompt on this machine, so Alyn
 
 **Google Antigravity:** read `antigravity.md` in this skill's folder and follow only that file. The rest of this page is for Claude Code.
 
+## GitHub Copilot CLI
+
+Only when this session is GitHub Copilot CLI (the Alynki tools are named `alynki-<tool>`, with no
+`mcp__` prefix): follow this section alone and stop; nothing else in this skill applies.
+
+This setup is what allows Alynki's tools, so a `load_context` refused for permission before it does
+not end the session or block it: carry on with step 1, whatever the load-first notice says about a
+refusal.
+
+1. Run `sh "<plugin folder>/bin/setup-copilot.sh"` once, as one shell command. The plugin folder is
+   two levels above this skill's directory; write the path out in full, with no `..` in it.
+2. Tell the user its output: the tools in `tools.txt` now run without asking in every directory, the
+   seven in `ask-tools.txt` (they change who has access or manage agents) still ask each time, and
+   the same command with `--undo` makes Copilot ask again. Edit no file yourself, and never
+   touch `~/.claude`.
+
 Adds an exact-name rule to `permissions.allow` for each of the 37 Alynki MCP tools in
 `${CLAUDE_PLUGIN_ROOT}/tools.txt`, and an exact-name rule to `permissions.ask` for each of the seven
 in `${CLAUDE_PLUGIN_ROOT}/ask-tools.txt`, in the user's own settings file, `settings.json` in the Claude folder (`$CLAUDE_CONFIG_DIR` when that
