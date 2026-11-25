@@ -765,6 +765,13 @@ cursor_says_run_mode_allowlist() {
     grep -qF 'The seven ask only in [Run Mode](https://cursor.com/docs/agent/security/run-modes) Allowlist' alynki-plugin/README.md
 }
 ok "Cursor: setup's message and both READMEs say the seven ask only in Run Mode Allowlist (#3686)" cursor_says_run_mode_allowlist
+# VS Code has no scriptable allowlist (alynki/alynki#3683): both READMEs give the manual step and the first-prompt timing.
+vscode_manual_step() {
+  grep -F '| VS Code |' README.md | grep -qF 'Always Allow' && grep -F '| VS Code |' README.md | grep -qF 'Allow Once' &&
+    grep -F '| VS Code |' README.md | grep -qF 'first message waits' &&
+    grep -F -- '- **VS Code:**' alynki-plugin/README.md | grep -qF 'Always Allow' && grep -F -- '- **VS Code:**' alynki-plugin/README.md | grep -qF 'first chat message waits'
+}
+ok "VS Code: both READMEs give the manual approval step and the first-prompt timing (#3683)" vscode_manual_step
 ok "the Cursor beforeMCPExecution hook answers ask for the seven of Alynki's server and nothing else" cursor_hook_asks_for_the_seven_only
 
 # Grok Build (alynki/alynki#3685). It installs the repository root: a root plugin.json in the installed folder wins over
