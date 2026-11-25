@@ -626,7 +626,7 @@ ok "the Cursor marketplace lists alynki alone, from a folder that exists" cursor
 ok "both READMEs show Cursor's block (CLIENT_ID alynki-cursor, ~/.cursor/mcp.json) and link to alynki.com/docs" readmes_show_the_cursor_block
 CURHOOKS=alynki-plugin/hooks/cursor-hooks.json
 cursor_hooks_use_the_cursor_shape() {
-  [ "$(jq -r .hooks "$CUR")" = "./hooks/cursor-hooks.json" ] && [ "$(jq -r '.hooks | keys | join(",")' "$CURHOOKS")" = sessionStart,subagentStart ] &&
+  [ "$(jq -r .hooks "$CUR")" = "./hooks/cursor-hooks.json" ] && [ "$(jq -r '.hooks | keys | join(",")' "$CURHOOKS")" = beforeMCPExecution,sessionStart,subagentStart ] &&
     [ "$(jq -r '.hooks.sessionStart[0].command' "$CURHOOKS")" = 'sh "${CURSOR_PLUGIN_ROOT}"/hooks/session-start.sh cursor session' ] &&
     [ "$(jq -r '.hooks.subagentStart[0].command' "$CURHOOKS")" = 'sh "${CURSOR_PLUGIN_ROOT}"/hooks/session-start.sh cursor subagent' ]
 }
@@ -634,7 +634,7 @@ cursor_output_is_additional_context_only() {
   local e
   for e in session subagent; do
     sh alynki-plugin/hooks/session-start.sh cursor "$e" </dev/null |
-      jq -e --rawfile w alynki-plugin/hooks/load-first.md 'keys == ["additional_context"] and .additional_context + "\n" == $w' >/dev/null || return 1
+      jq -e --rawfile w alynki-plugin/hooks/load-first.md 'keys == ["additional_context"] and .additional_context == ($w | rtrimstr("\n")) + " In Cursor: run /alynki-setup, which allows the same 37 for this machine."' >/dev/null || return 1
   done
 }
 cursor_logo_is_the_listing_icon() { [ "$(jq -r .logo "$CUR")" = "./assets/logo.png" ] && cmp -s alynki-plugin/assets/logo.png alynki-plugin/.claude-plugin/icon.png; }
@@ -712,6 +712,61 @@ ok "Copilot: a second setup changes nothing" copilot_second_setup_changes_nothin
 ok "Copilot: --undo asks again" copilot_undo_asks_again
 ok "Copilot: the permissionRequest hook is declared for the alynki server only" copilot_permission_hook_is_declared
 ok "Copilot: the setup skill sends Copilot to bin/setup-copilot.sh" grep -qF 'bin/setup-copilot.sh' "$SKILL"
+
+# Cursor's setup (alynki/alynki#3686): /alynki-setup, its own skills folder, an exact-name allowlist and an ask hook for the seven.
+CURSKILL=alynki-plugin/cursor/skills/alynki-setup/SKILL.md
+cursor_lists_its_own_setup_skill() {
+  [ "$(jq -r .skills "$CUR")" = "./cursor/skills/" ] && grep -qx 'name: alynki-setup' "$CURSKILL" && grep -qF 'cursor/setup.sh' "$CURSKILL" &&
+    [ "$(find alynki-plugin/cursor/skills -name SKILL.md | wc -l | tr -d ' ')" -eq 1 ]
+}
+cursor_setup() { HOME=$1 sh alynki-plugin/cursor/setup.sh; }
+# A HOME with another entry, another key, an exact and a wildcard entry covering the seven on this server, and a wider one.
+cursor_setup_writes_the_lists() {
+  local h out s=plugin-alynki-alynki
+  h=$(mktemp -d) || return 1
+  mkdir -p "$h/.cursor"
+  printf '{"mcpAllowlist":["other:tool","%s:grant_principal","%s:revoke_*","*:invite_*"],"terminalAllowlist":["ls"]}\n' "$s" "$s" >"$h/.cursor/permissions.json"
+  out=$(cursor_setup "$h") &&
+    jq -e --rawfile t "$LIST" --arg s "$s" '.terminalAllowlist == ["ls"] and .mcpAllowlist == ["other:tool","*:invite_*"] + ($t | split("\n") | map(select(length > 0) | $s + ":" + .))' "$h/.cursor/permissions.json" >/dev/null &&
+    printf '%s' "$out" | grep -qF 'WARNING: the allow entry "*:invite_*" also covers invite_principal' &&
+    cp "$h/.cursor/permissions.json" "$h/first" && cursor_setup "$h" | grep -qF 'already set up' && cmp -s "$h/first" "$h/.cursor/permissions.json"
+  local r=$?; rm -rf "$h"; return $r
+}
+cursor_setup_from_nothing_allows_37() {
+  local h r
+  h=$(mktemp -d) || return 1
+  cursor_setup "$h" >/dev/null && [ "$(jq '.mcpAllowlist | length' "$h/.cursor/permissions.json")" -eq 37 ] && ! cursor_setup "$h" | grep -q WARNING
+  r=$?; rm -rf "$h"; return $r
+}
+cursor_setup_refuses_comments() {
+  local h r
+  h=$(mktemp -d) || return 1
+  mkdir -p "$h/.cursor"
+  printf '{\n  // mine\n  "mcpAllowlist": []\n}\n' >"$h/.cursor/permissions.json"
+  cp "$h/.cursor/permissions.json" "$h/first"
+  ! cursor_setup "$h" >/dev/null 2>&1 && cmp -s "$h/first" "$h/.cursor/permissions.json"
+  r=$?; rm -rf "$h"; return $r
+}
+cursor_ask() { printf '{"mcp_server_name":"%s","tool_name":"%s"}' "$1" "$2" | sh -c "CURSOR_PLUGIN_ROOT=$PWD/alynki-plugin; $(jq -r '.hooks.beforeMCPExecution[0].command' "$CURHOOKS")"; }
+cursor_hook_asks_for_the_seven_only() {
+  local t
+  while IFS= read -r t; do [ "$(cursor_ask plugin-alynki-alynki "$t" | jq -r .permission)" = ask ] || return 1; done <"$ASKLIST"
+  while IFS= read -r t; do [ "$(cursor_ask plugin-alynki-alynki "$t")" = '{}' ] || return 1; done <"$LIST"
+  [ "$(cursor_ask other grant_principal)" = '{}' ]
+}
+ok "Cursor lists one setup skill of its own, alynki-setup, which runs cursor/setup.sh" cursor_lists_its_own_setup_skill
+ok "cursor/setup.sh allows the 37, removes this server's entries covering the seven, keeps the rest, warns on a wider one and changes nothing twice" cursor_setup_writes_the_lists
+ok "cursor/setup.sh on an empty HOME writes exactly 37 entries and no warning" cursor_setup_from_nothing_allows_37
+ok "cursor/setup.sh refuses a permissions.json with comments and leaves it untouched" cursor_setup_refuses_comments
+# The seven ask only in Run Mode Allowlist (founder decision on #3686, 2026-11-25): setup's message and both READMEs say so.
+cursor_says_run_mode_allowlist() {
+  local h; h=$(mktemp -d) || return 1
+  cursor_setup "$h" | grep -qF 'The seven ask only in Run Mode "Allowlist"' &&
+    grep -F '| Cursor |' README.md | grep -qF 'Allowlist. In Auto-review' &&
+    grep -qF 'The seven ask only in [Run Mode](https://cursor.com/docs/agent/security/run-modes) Allowlist' alynki-plugin/README.md
+}
+ok "Cursor: setup's message and both READMEs say the seven ask only in Run Mode Allowlist (#3686)" cursor_says_run_mode_allowlist
+ok "the Cursor beforeMCPExecution hook answers ask for the seven of Alynki's server and nothing else" cursor_hook_asks_for_the_seven_only
 
 echo "$n assertions, $failed failed"
 [ "$failed" -eq 0 ] || exit 1
