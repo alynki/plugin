@@ -1,0 +1,12 @@
+{
+  "name": "alynki-marketplace",
+  "interface": { "displayName": "Alynki" },
+  "plugins": [
+    {
+      "name": "alynki",
+      "source": { "source": "local", "path": "./" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    }
+  ]
+}
