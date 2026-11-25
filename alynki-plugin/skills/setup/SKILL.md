@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Allow 37 Alynki MCP tools without a prompt on this machine, so Alynki stops asking for permission in each new repository, while the seven tools that change who has access still ask a person each time
+description: Allow 37 Alynki MCP tools without a prompt on this machine in Claude Code, GitHub Copilot CLI or Antigravity CLI, so Alynki stops asking for permission in each new repository, while the seven tools that change who has access still ask a person each time
 ---
 
 # Alynki setup
