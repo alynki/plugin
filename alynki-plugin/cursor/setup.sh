@@ -27,7 +27,7 @@ jq -s --rawfile t "$list" --rawfile a "$asklist" --arg s "$SERVER" '
   ($a | lines) as $ask | ($t | lines | map($s + ":" + .)) as $new
   | def covers_ask: split(":") as $p
       | ($p | length) == 2 and ($p[0] | ascii_downcase) == $s
-        and ($p[1] | ascii_downcase | glob) as $re | any($ask[]; test($re));
+        and (($p[1] | ascii_downcase | glob) as $re | any($ask[]; test($re)));
   if length > 1 then error("more than one value") else (.[0] // {}) end
   | if type != "object" or ((.mcpAllowlist // []) | type != "array" or any(.[]; type != "string"))
     then error("unexpected shape") else . end
