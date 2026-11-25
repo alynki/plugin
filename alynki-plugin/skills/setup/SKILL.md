@@ -5,6 +5,8 @@ description: Allow 37 Alynki MCP tools without a prompt on this machine, so Alyn
 
 # Alynki setup
 
+**Google Antigravity:** read `antigravity.md` in this skill's folder and follow only that file. The rest of this page is for Claude Code.
+
 Adds an exact-name rule to `permissions.allow` for each of the 37 Alynki MCP tools in
 `${CLAUDE_PLUGIN_ROOT}/tools.txt`, and an exact-name rule to `permissions.ask` for each of the seven
 in `${CLAUDE_PLUGIN_ROOT}/ask-tools.txt`, in the user's own settings file, `settings.json` in the Claude folder (`$CLAUDE_CONFIG_DIR` when that

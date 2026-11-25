@@ -173,9 +173,9 @@ ok "the README says each step output and check evaluation is saved with a reason
 # (founder option B, 2026-11-15: any change to it is the founder's decision, so its hashes are pinned), the folder has its own LICENSE.
 HOOKS=alynki-plugin/hooks/hooks.json
 # The hook text now lives in hooks/load-first.md; the pins are the hashes of what `session-start.sh claude` prints. They changed once since #3148,
-# for the permission hint (alynki/alynki#3582), which the founder asked for, and for its Codex sentence (alynki/alynki#3487, asked 2026-11-25).
-SESSION_START_SHA256=4c3761f274bc42dead3d85735841a20fb1706726490a4d78b921407fa7bad927
-SUBAGENT_START_SHA256=2a464b37a79aee9b362078a66b2a93dae607417f811cc42dad69abab666ddc7a
+# for the permission hint (alynki/alynki#3582), which the founder asked for, and for its Codex and Antigravity sentences (alynki/alynki#3487 and #3677, asked 2026-11-25).
+SESSION_START_SHA256=9d0ae86a0f7c2273df9476d088d98d6bd76b0d7b91a34851c2b9fd22f7e02305
+SUBAGENT_START_SHA256=934a9004db93025fb0ca94e6ef291dd8b58d6004a72531af96c2dc1d217d4234
 sha_of() { { sha256sum "$1" 2>/dev/null || shasum -a 256 "$1"; } | cut -d' ' -f1; }
 # shellcheck disable=SC2016 # ${CLAUDE_PLUGIN_ROOT} is literal text in the hook command
 hook_commands_use_plugin_root() {
@@ -434,19 +434,40 @@ no_second_copy() {
     if grep -rlw --exclude-dir=.git --exclude=tools.txt --exclude=ask-tools.txt --exclude=README.md --exclude=load-first.md -- "$t" alynki-plugin .claude-plugin | grep -q .; then return 1; fi
   done
 }
-# Run the Antigravity script under a temporary HOME holding other settings and the allow rules 0.29 wrote for two of
-# the seven: it merges the 37, removes the seven's allow rules, and a second run is byte-identical.
+# Run the Antigravity script under a temporary HOME holding other settings, an allow rule for one of the seven, an ask
+# rule for one of the 37 and an old rule under the server name alynki: under alynki_alynki it allows the 37, asks for the
+# seven and removes the wrong-way rules, and a second run is byte-identical.
 agy_idempotent() {
   local h f a ok=1
   h=$(mktemp -d) || return 1
   f=$h/.gemini/antigravity-cli/settings.json
   mkdir -p "$(dirname "$f")"
-  printf '{"theme":"dark","permissions":{"deny":["command(sudo)"],"allow":["command(git)","mcp(alynki/grant_principal)","mcp(alynki/revoke_principal_agent)"]}}' >"$f"
+  printf '{"theme":"dark","permissions":{"deny":["command(sudo)"],"ask":["command(rm)","mcp(alynki_alynki/load_context)"],"allow":["command(git)","mcp(alynki/load_context)","mcp(alynki_alynki/grant_principal)"]}}' >"$f"
   HOME=$h sh "$AGYSET" >/dev/null && cp "$f" "$h/first" && HOME=$h sh "$AGYSET" >/dev/null && cmp -s "$h/first" "$f" &&
     [ "$(jq -r '.theme' "$f")" = dark ] && [ "$(jq -c '.permissions.deny' "$f")" = '["command(sudo)"]' ] &&
-    [ "$(jq -r '.permissions.allow[0]' "$f")" = 'command(git)' ] && [ "$(jq -r '[.permissions.allow[] | select(startswith("mcp(alynki/"))] | length' "$f")" -eq 37 ] &&
-    [ "$(jq -r '.permissions.allow | length' "$f")" -eq 38 ] || ok=0
-  for a in $SEVEN; do jq -e --arg r "mcp(alynki/$a)" '.permissions.allow | index($r) == null' "$f" >/dev/null || ok=0; done
+    [ "$(jq -c '.permissions.allow[0:2]' "$f")" = '["command(git)","mcp(alynki/load_context)"]' ] &&
+    [ "$(jq -r '[.permissions.allow[] | select(startswith("mcp(alynki_alynki/"))] | length' "$f")" -eq 37 ] &&
+    [ "$(jq -r '.permissions.allow | length' "$f")" -eq 39 ] &&
+    [ "$(jq -r '.permissions.ask[0]' "$f")" = 'command(rm)' ] && [ "$(jq -r '.permissions.ask | length' "$f")" -eq 8 ] || ok=0
+  for a in $SEVEN; do jq -e --arg r "mcp(alynki_alynki/$a)" '(.permissions.allow | index($r)) == null and (.permissions.ask | index($r)) != null' "$f" >/dev/null || ok=0; done
+  rm -rf "$h"
+  [ "$ok" -eq 1 ]
+}
+# A leftover allow rule under the old global server name alynki for one of the seven, or a wildcard, is named to the
+# person and left in place (#3677 AC 3, review R8); a clean file prints no such report.
+agy_reports_leftover_allow() {
+  local h f out ok=1
+  h=$(mktemp -d) || return 1
+  f=$h/.gemini/antigravity-cli/settings.json
+  mkdir -p "$(dirname "$f")"
+  printf '{"permissions":{"allow":["mcp(alynki/grant_principal)","mcp(alynki/load_context)","mcp(alynki/*)"]}}' >"$f"
+  out=$(HOME=$h sh "$AGYSET") || ok=0
+  printf '%s' "$out" | grep -qF 'let tools that change who has access run without asking' &&
+    printf '%s' "$out" | grep -qxF 'mcp(alynki/grant_principal)' && printf '%s' "$out" | grep -qxF 'mcp(alynki/*)' &&
+    ! printf '%s' "$out" | grep -qxF 'mcp(alynki/load_context)' &&
+    jq -e '.permissions.allow | index("mcp(alynki/grant_principal)") != null' "$f" >/dev/null || ok=0
+  rm -rf "$h"; h=$(mktemp -d) || return 1
+  out=$(HOME=$h sh "$AGYSET") && ! printf '%s' "$out" | grep -qF 'run without asking' || ok=0
   rm -rf "$h"
   [ "$ok" -eq 1 ]
 }
@@ -473,6 +494,7 @@ ok "the Antigravity script reads the asking list (ask-tools.txt)" grep -qF 'ask-
 ok "no tool name outside the list file appears in the plugin's skill, scripts or manifests (no second copy)" no_second_copy
 ok "the Antigravity script merges and is idempotent under a temporary HOME (two runs, cmp)" agy_idempotent
 ok "the Antigravity script leaves an unparseable settings file untouched" agy_refuses_bad_json
+ok "the Antigravity script names a leftover allow rule of the global alynki server, or a wildcard, that lets one of the seven run unprompted (#3677)" agy_reports_leftover_allow
 ok "both READMEs describe the setup per client and the shared list" bash -c 'grep -qF tools.txt README.md && grep -qF setup-antigravity.sh README.md && grep -qF setup-antigravity.sh alynki-plugin/README.md'
 ok "both READMEs say the seven access-changing tools ask (ask-tools.txt)" bash -c 'grep -qF ask-tools.txt README.md && grep -qF ask-tools.txt alynki-plugin/README.md'
 ok "the standard plugin's version is at least 0.30.0, the release in which the seven ask again" version_at_least "$STD" 0.30.0
@@ -630,17 +652,17 @@ hint_in() { # <shape> <event>: the printed output, once decoded, holds the whole
   out=$(sh alynki-plugin/hooks/session-start.sh "$1" "$2" </dev/null) || return 1
   printf '%s' "$out" | grep -qF 'If load_context is refused for permission, do not retry.' &&
     printf '%s' "$out" | grep -qF 'In Claude Code: run /alynki:setup, which allows '"$(grep -c . "$LIST")"' of Alynki' &&
-    printf '%s' "$out" | grep -qF 'In Antigravity CLI: run sh bin/setup-antigravity.sh' &&
+    printf '%s' "$out" | grep -qF 'In Antigravity CLI: run /setup' &&
     printf '%s' "$out" | grep -qF 'In Codex CLI: run $alynki:setup' &&
     printf '%s' "$out" | grep -qF 'If no user is present, end the session.'
 }
 ok "the Claude hook output (session and subagent) carries the permission hint: /alynki:setup, the 37 tools of tools.txt" bash -c "$(declare -f hint_in); LIST=$LIST; hint_in claude session && hint_in claude subagent"
 ok "the Codex hook output (session and subagent) carries the permission hint" bash -c "$(declare -f hint_in); LIST=$LIST; hint_in codex session && hint_in codex subagent"
-ok "the Antigravity session output carries the permission hint (setup-antigravity.sh)" bash -c "$(declare -f hint_in); LIST=$LIST; hint_in antigravity session"
+ok "the Antigravity session output carries the permission hint (/setup)" bash -c "$(declare -f hint_in); LIST=$LIST; hint_in antigravity session"
 ok "the Copilot hook output (session and subagent) carries the permission hint" bash -c "$(declare -f hint_in); LIST=$LIST; hint_in copilot session && hint_in copilot subagent"
 ok "the standard plugin's version is at least 0.32.0, the release of the permission hint" version_at_least "$STD" 0.32.0
 ok "the standard plugin's version is at least 0.33.0, the release of the Agent Plugins manifest" version_at_least "$STD" 0.33.0
-ok "the hint's setup script exists and is the one the READMEs name" bash -c 'test -f alynki-plugin/bin/setup-antigravity.sh && grep -qF "bin/setup-antigravity.sh" alynki-plugin/hooks/load-first.md && grep -qF setup-antigravity.sh alynki-plugin/README.md'
+ok "the hint's setup script exists and is the one the READMEs name" bash -c 'test -f alynki-plugin/bin/setup-antigravity.sh && grep -qF "bin/setup-antigravity.sh" alynki-plugin/skills/setup/antigravity.md && grep -qF setup-antigravity.sh alynki-plugin/README.md'
 
 echo "$n assertions, $failed failed"
 [ "$failed" -eq 0 ] || exit 1
