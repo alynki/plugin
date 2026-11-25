@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^(alynki__grant_principal|alynki__revoke_principal|alynki__invite_principal|alynki__revoke_principal_invite|alynki__create_principal_agent|alynki__update_principal_agent|alynki__revoke_principal_agent)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${GROK_PLUGIN_ROOT}\"/alynki-plugin/grok/ask.sh",
+            "timeout": 10,
+            "failClosed": true
+          }
+        ]
+      }
+    ]
+  }
+}

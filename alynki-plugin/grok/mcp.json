@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "alynki": {
+      "type": "http",
+      "url": "https://mcp.alynki.com/mcp",
+      "oauth": {
+        "clientId": "alynki-grok",
+        "scopes": ["context", "offline_access"]
+      }
+    }
+  }
+}
