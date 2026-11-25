@@ -82,7 +82,7 @@ fi
 } >"$tmp/new"
 {
   cat "$here/hooks/load-first.md"
-  printf '\nIn Grok Build: run /alynki:setup, which allows the same 37 for this machine. Call load_context through use_tool as alynki__load_context.\n'
+  printf '\nIn Grok Build, call load_context through use_tool as alynki__load_context.\n'
 } >"$tmp/rules"
 
 allowed=$(grep -c . "$here/tools.txt"); asking=$(grep -c . "$here/ask-tools.txt")
