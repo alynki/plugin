@@ -4,6 +4,9 @@
     "sessionStart": [
       { "command": "sh \"${CURSOR_PLUGIN_ROOT}\"/hooks/session-start.sh cursor session" }
     ],
+    "beforeMCPExecution": [
+      { "command": "sh \"${CURSOR_PLUGIN_ROOT}\"/cursor/ask.sh" }
+    ],
     "subagentStart": [
       { "command": "sh \"${CURSOR_PLUGIN_ROOT}\"/hooks/session-start.sh cursor subagent" }
     ]

@@ -1,0 +1,26 @@
+# Installs the plugin from this checkout into a clean CODEX_HOME and asserts that Codex lists the
+# sessionStart and subagentStart hooks (alynki/alynki#3682). 0.33.0 passed the manifest checks and
+# Codex loaded no hooks (alynki/alynki#3668); this asks Codex itself. Codex is pinned: raise the pin
+# deliberately, and read what hooks/list returns when it changes.
+name: codex-hooks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  codex-hooks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Codex CLI
+        run: npm install --global @openai/codex@0.172.0
+      - name: A clean Codex home lists Alynki's two hooks
+        run: scripts/check-codex-hooks.py .
+      - name: The same check fails on the 0.33.0 layout, which loaded no hooks
+        run: |
+          git fetch --depth 1 origin tag v0.33.0
+          git worktree add --detach "$RUNNER_TEMP/v0330" v0.33.0
+          if out=$(scripts/check-codex-hooks.py "$RUNNER_TEMP/v0330"); then echo "$out"; echo "the check passed on 0.33.0"; exit 1; fi
+          echo "$out"
+          printf '%s' "$out" | grep -qF 'lists for the alynki plugin: no hooks'

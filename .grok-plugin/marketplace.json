@@ -1,0 +1,17 @@
+{
+  "name": "alynki-marketplace",
+  "description": "Alynki's business context layer.",
+  "owner": {
+    "name": "Alynki"
+  },
+  "plugins": [
+    {
+      "name": "alynki",
+      "description": "From your people to your customers, faster and with higher quality.",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/alynki/plugin.git"
+      }
+    }
+  ]
+}

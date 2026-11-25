@@ -19,7 +19,7 @@ If your operator issued you a pinned token, put it in the plugin's **Alynki API 
 
 ## Codex CLI
 
-OpenAI's [Developer commands](https://developers.openai.com/codex/cli/reference). Codex installs from the repository root, whose `.codex-plugin/plugin.json` names this folder's `mcp.json` (the same address, with a transport `type`), skills and `hooks/codex-hooks.json`: the same script as Claude Code's hooks, printing `additionalContext` only, because Codex drops a hook output that carries a field it does not know. Install it with `codex plugin marketplace add alynki/plugin` and `codex plugin add alynki@alynki-marketplace`, and sign in when Codex first connects. Codex runs a plugin's hooks only after you review and trust them once with `/hooks` in Codex, so the load-first instruction does not run from the public plugin directory. A session then starts with `load_context`; without the hook, ask your agent to call `load_context` first.
+OpenAI's [Developer commands](https://developers.openai.com/codex/cli/reference). Codex installs from the repository root, whose `.codex-plugin/plugin.json` names this folder's `mcp.json` (the same address, with a transport `type`), skills and `hooks/codex-hooks.json`: the same script as Claude Code's hooks, printing `additionalContext` only, because Codex drops a hook output that carries a field it does not know. Install it with `codex plugin marketplace add alynki/plugin` and `codex plugin add alynki@alynki-marketplace`, and sign in when Codex first connects. Codex runs a plugin's hooks only after you review and trust them once with `/hooks` in Codex, so the load-first instruction does not run from the public plugin directory. A session then starts with `load_context`; without the hook, ask your agent to call `load_context` first. `$alynki:setup` (`codex/skills/setup`, which runs `codex/setup.sh` only when you invoke it) writes the plugin's tool policy into your Codex `config.toml`: the tools in `tools.txt` run without asking and those in `ask-tools.txt` ask before each call; to undo it, delete the `[plugins."alynki@alynki-marketplace".mcp_servers.alynki...]` tables.
 
 ## Antigravity CLI
 
@@ -65,12 +65,23 @@ Cursor's [Model Context Protocol (MCP)](https://cursor.com/docs/mcp). Alynki is 
 
 ## Grok Build
 
-xAI's [Skills, Plugins & Marketplaces](https://docs.x.ai/build/features/skills-plugins-marketplaces). Grok Build has no hook that can inject text into a session, so this plugin ships none. Add one line to `~/.grok/AGENTS.md`: call Alynki's `load_context` first.
+xAI's [Skills, Plugins & Marketplaces](https://docs.x.ai/build/features/skills-plugins-marketplaces). Install the repository root, then open `/mcps`, select `alynki` and press `i` to sign in, run `/alynki:setup`, and start a new session:
+
+```bash
+grok plugin install alynki/plugin --trust
+```
+
+The root `.grok-plugin/plugin.json` names this folder's `grok/mcp.json` (the same address, with Alynki's public loopback client), its setup skill and one `PreToolUse` hook. Grok Build has no hook that can inject text into a session; setup writes the load-first wording to `~/.grok/rules/` instead.
 
 ## Setup per client
 
 - **Claude Code:** run `/alynki:setup` once.
-- **Antigravity CLI:** run `sh bin/setup-antigravity.sh` (needs `jq`). It adds `mcp(alynki/<tool>)` rules for the 37 tools in `tools.txt` to `permissions.allow` in `~/.gemini/antigravity-cli/settings.json`, removes any allow rule for the seven access-changing tools in `ask-tools.txt` so Antigravity asks before each, keeps your other entries, and changes nothing on a second run.
+- **Codex CLI:** run `$alynki:setup` once. It runs `codex/setup.sh`, which writes `approve` for the 37 tools in `tools.txt` and `prompt` for the seven in `ask-tools.txt` into `$CODEX_HOME/config.toml`; a second run changes nothing. If your organisation sets `allow_managed_hooks_only = true` ([Codex hooks](https://developers.openai.com/codex/hooks)), Codex skips every plugin hook, so sessions are not told to call `load_context` first and setup cannot change that: ask your administrator to add Alynki's hook as a managed hook in `requirements.toml`.
+- **Antigravity CLI:** run `/setup` once and approve its one command outside the sandbox. It runs `bin/setup-antigravity.sh` (needs `jq`), which writes to `~/.gemini/antigravity-cli/settings.json` a `mcp(alynki_alynki/<tool>)` rule in `permissions.allow` for the 37 tools in `tools.txt` and in `permissions.ask` for the seven access-changing tools in `ask-tools.txt`, removes any allow rule for those seven, keeps your other entries, and changes nothing on a second run. It names, and leaves for you to remove, any allow rule under the old server name `alynki` (or a wildcard) that lets one of the seven run without asking.
+- **GitHub Copilot CLI:** run `/alynki:setup` once. It runs `bin/setup-copilot.sh`: hooks then allow the 37 tools of `tools.txt` and make the seven of `ask-tools.txt` ask each time; `--undo` reverses it. Limits: the hooks recognise Alynki by the server name `alynki` only, so any server of that name is treated as Alynki's; hooks run only in a folder you have trusted; if the hook script crashes, Copilot denies the call; autopilot treats ask as deny; not on Windows.
+- **Cursor:** run `/alynki-setup` once and approve its one command (needs `jq`). It adds `plugin-alynki-alynki:<tool>` for the 37 tools in `tools.txt` to `mcpAllowlist` in `~/.cursor/permissions.json`, removes this server's entries that cover the seven in `ask-tools.txt`, keeps your other entries, and changes nothing on a second run. The seven ask only in [Run Mode](https://cursor.com/docs/agent/security/run-modes) Allowlist: Auto-review's classifier can run them without asking, and Run Everything runs them. That file's list replaces the MCP allowlist in Cursor Settings.
+- **Grok Build:** run `/alynki:setup` once. It writes the rules for the same 37 and 7 into `~/.grok/config.toml` and writes `~/.grok/rules/alynki-load-context.md`.
+- **VS Code:** no setup script, since VS Code has no setting for a named list of MCP tools. Choose **Always Allow** (or **Chat: Manage Tool Approval**) for the 37 tools in `tools.txt` and **Allow Once** for the seven in `ask-tools.txt`. Its docs do not say whether the first chat message waits for the MCP server; if a first chat has no Alynki tools, send the message again.
 - **Other clients:** no local permission file; see https://alynki.com/docs/.
 
 ## What you can ask
@@ -79,11 +90,11 @@ What your business already knows, how you decide, who may do what and what good 
 
 ## What it runs, sends and fetches
 
-Claude Code runs three things from this plugin, and nothing else (Codex, Cursor and Antigravity run only the hook script, the same way; `bin/setup-antigravity.sh` runs only when you run it and writes only that one settings file):
+Claude Code runs three things from this plugin, and nothing else (Codex and Antigravity run only the hook script, the same way; Cursor also runs `cursor/ask.sh` before each MCP call, which asks for the seven access-changing tools and reads nothing but the call; `bin/setup-antigravity.sh`, Codex's `codex/setup.sh` and `cursor/setup.sh` run only when you invoke them, and each writes only its one settings file; Grok Build runs `grok/ask.sh` before each of the seven access-changing tools, which reads the call and prints ask or deny, and `grok/setup.sh` only when you invoke setup):
 
 - **Two hooks**, `SessionStart` and `SubagentStart`. Each runs `sh "${CLAUDE_PLUGIN_ROOT}"/hooks/session-start.sh claude <session|subagent>`, which prints the fixed text in `hooks/load-first.md` and tells the session, and every subagent it starts, to call `load_context` first. The text applies even when the user's message asks the model not to use tools, and it says the model may tell the user it loaded the context. The hooks make no network call and read nothing else.
 - **A header helper**, `bin/headers.sh`, which Claude Code runs when it connects, reconnects or meets a 401 or 403 from Alynki. It needs `jq`, reads only the `alynki` entry under `pluginConfigs` in `$CLAUDE_CONFIG_DIR/settings.json` (`~/.claude/settings.json` when that is unset), and prints a JSON object of headers: `Authorization: Bearer <token>` when a pinned token is set, and `X-Alynki-Model: <model>` when the optional model setting is a plain model id. It writes nothing, makes no network call and never prints the model.
-- **A setup skill**, `/alynki:setup`, which runs only when you invoke it. It shows you an edit to `~/.claude/settings.json` that allows 37 of Alynki's tools (listed in `tools.txt`) without a prompt and makes the seven that change who has access (listed in `ask-tools.txt`) ask you before each call, and applies the edit once you agree.
+- **A setup skill**, `/alynki:setup`, which runs only when you invoke it. It shows you an edit to your `settings.json` in the Claude folder (`$CLAUDE_CONFIG_DIR` when set, `~/.claude` otherwise) that allows 37 of Alynki's tools (listed in `tools.txt`) without a prompt and makes the seven that change who has access (listed in `ask-tools.txt`) ask you before each call, and applies the edit once you agree.
 
 It sends your requests, over HTTPS, only to `https://mcp.alynki.com/mcp`, and signs you in at `https://auth.alynki.com` through Claude Code's OAuth flow in your browser. It fetches only what that server returns for your account. It sends no analytics and contacts no other host.
 

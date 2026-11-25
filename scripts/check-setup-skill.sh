@@ -125,6 +125,7 @@ marketplace_lists_alynki_only() { [ "$(jq -r '[.plugins[].name] | join(",")' .cl
 variant_directory_gone() { [ ! -e "alynki-${S}ed-plugin" ]; }
 readme_names_it_only_in_the_note() { ! grep -v -F -- "$NOTE" README.md | grep -qiE -- "$GONE"; }
 note_names_the_commit() { grep -F -- "$NOTE" README.md | grep -qE '[0-9a-f]{40}'; }
+# Grok Build signs in with its own client, alynki-grok (alynki/alynki#3685, #3690), so no line may name alynki-local.
 plugin_folder_names_it_nowhere() { ! grep -rqiE --exclude-dir=.git -- "$GONE" alynki-plugin .claude-plugin; }
 ok "the marketplace lists alynki alone" marketplace_lists_alynki_only
 ok "the sealed variant's directory is gone from main" variant_directory_gone
@@ -132,6 +133,7 @@ ok "the README names the sealed variant, its server segment and its local binary
 ok "the release note names the commit that last carried the sealed variant (a full 40-character SHA)" note_names_the_commit
 ok "the setup skill, the plugin folder and the marketplace name no sealed variant, server segment or local binary" plugin_folder_names_it_nowhere
 ok "the setup skill recognises one server segment, plugin_alynki_alynki, by literal equality" grep -qF 'exactly one server segment' "$SKILL"
+ok "the setup skill writes to the Claude folder of CLAUDE_CONFIG_DIR when set, ~/.claude otherwise (#3679)" bash -c 'grep -qF "\${CLAUDE_CONFIG_DIR:-\$HOME/.claude}" "$1" && ! grep -qF "Write only to \`~/.claude/settings.json\`" "$1" && ! grep -qF "**Read \`~/.claude/settings.json\`.**" "$1"' _ "$SKILL"
 
 # The listing (alynki/alynki#3263): words from the approved listing kit, the icon, the URLs and the plugin's own README.
 PLUGIN_README=alynki-plugin/README.md
@@ -172,9 +174,10 @@ ok "the README says each step output and check evaluation is saved with a reason
 # (founder option B, 2026-11-15: any change to it is the founder's decision, so its hashes are pinned), the folder has its own LICENSE.
 HOOKS=alynki-plugin/hooks/hooks.json
 # The hook text now lives in hooks/load-first.md; the pins are the hashes of what `session-start.sh claude` prints. They changed once since #3148,
-# for the permission hint (alynki/alynki#3582), which the founder asked for.
-SESSION_START_SHA256=9146b1446215ecffbf5253af038fa9fbc7fec7e2a12e896c0c5f75956a2fc945
-SUBAGENT_START_SHA256=c791e9dd014a4a49a172438bc51499997954c0c2bb06c1ae1b26b86d547eae1e
+# for the permission hint (alynki/alynki#3582), which the founder asked for, and for the one hint naming every client's setup (alynki/alynki#3680;
+# the founder's approval of that text is alynki/alynki#3705).
+SESSION_START_SHA256=b4e3f75659a15c21027207ab1d0fb72a97d3b42670c5103808b4e8f0155e3fde
+SUBAGENT_START_SHA256=d811e9215b561d418ef6e686fd78d97d10fa0d2338c8007dcf2346aab30403b5
 sha_of() { { sha256sum "$1" 2>/dev/null || shasum -a 256 "$1"; } | cut -d' ' -f1; }
 # shellcheck disable=SC2016 # ${CLAUDE_PLUGIN_ROOT} is literal text in the hook command
 hook_commands_use_plugin_root() {
@@ -241,7 +244,6 @@ copilot_output_has_the_wording() {
   sh alynki-plugin/hooks/session-start.sh copilot session </dev/null | jq -e --rawfile w alynki-plugin/hooks/load-first.md '.additionalContext + "\n" == $w' >/dev/null
 }
 unknown_shape_refused() { ! sh alynki-plugin/hooks/session-start.sh nope session </dev/null >/dev/null 2>&1; }
-no_grok_hook() { [ ! -e alynki-plugin/.grok-plugin ]; }
 # shellcheck disable=SC2016 # the backticks are literal Markdown
 readmes_cover_the_clients() {
   local f
@@ -274,7 +276,6 @@ ok "session-start.sh antigravity prints the wording as an injected systemMessage
 ok "the Antigravity hooks.json command prints the script's output (run from the plugin root)" antigravity_hook_runs_the_script
 ok "session-start.sh copilot prints the wording as top-level additionalContext" copilot_output_has_the_wording
 ok "session-start.sh refuses an unknown shape" unknown_shape_refused
-ok "no Grok hook ships (Grok Build session hooks cannot inject)" no_grok_hook
 ok "both READMEs cover Codex CLI (its own hook file, the one-time trust, the marketplace install), Antigravity CLI and load_context" readmes_cover_the_clients
 
 # Codex gets its own hook file (alynki/alynki#3442): Codex drops a SessionStart output carrying initialUserMessage.
@@ -319,6 +320,42 @@ codex_installs_a_plugin_with_hooks() {
 codex_marketplace_matches() { [ "$(jq -r .name .agents/plugins/marketplace.json)" = "$(jq -r .name .claude-plugin/marketplace.json)" ]; }
 ok "the folder Codex installs has no root Agent Plugins plugin.json, and its Codex manifest names files that exist" codex_installs_a_plugin_with_hooks
 ok "the Codex marketplace carries the Claude marketplace's name" codex_marketplace_matches
+
+# Codex's own setup: a skill and script apart from Claude's; it approves every tool of this plugin's server.
+CODEXSET=alynki-plugin/codex/setup.sh
+SEVEN_ASK="create_principal_agent grant_principal invite_principal revoke_principal revoke_principal_agent revoke_principal_invite update_principal_agent"
+codex_manifest_names_its_skill() { [ "$(jq -r .skills "$CODEX")" = ./alynki-plugin/codex/skills/ ] && grep -qx 'name: setup' alynki-plugin/codex/skills/setup/SKILL.md && grep -qF 'setup.sh' alynki-plugin/codex/skills/setup/SKILL.md; }
+# A temporary CODEX_HOME with other settings, a server default of approve and an allow rule on one of the seven:
+# the 37 are approve, the seven prompt, the default is gone, the rest is kept, and a second run is byte-identical.
+codex_mode() { awk -v h="[plugins.\"alynki@alynki-marketplace\".mcp_servers.alynki.tools.$2]" '$0 == h { getline; print; exit }' "$1"; }
+codex_setup_idempotent() {
+  local h f t ok=1 p='plugins."alynki@alynki-marketplace"'
+  h=$(mktemp -d) || return 1
+  f=$h/config.toml
+  printf 'model = "m"\n[%s]\nenabled = true\n[%s.mcp_servers.alynki]\ndefault_tools_approval_mode = "approve"\n[%s.mcp_servers.alynki.tools.grant_principal]\napproval_mode = "approve"\n[%s.mcp_servers.alynki.tools."load_run"]\napproval_mode = "prompt"\noutput_token_limit = 9\n[mcp_servers.other]\ndefault_tools_approval_mode = "approve"\n' "$p" "$p" "$p" "$p" >"$f"
+  CODEX_HOME=$h sh "$CODEXSET" >/dev/null && cp "$f" "$h/first" && CODEX_HOME=$h sh "$CODEXSET" >/dev/null && cmp -s "$h/first" "$f" &&
+    [ "$(grep -c '^approval_mode = "approve"$' "$f")" -eq 37 ] && [ "$(grep -c '^approval_mode = "prompt"$' "$f")" -eq 7 ] &&
+    [ "$(grep -c '^default_tools_approval_mode = "approve"$' "$f")" -eq 1 ] &&
+    [ "$(grep -A1 -F 'tools."load_run"]' "$f" | tail -n1)" = 'approval_mode = "approve"' ] &&
+    grep -qx 'output_token_limit = 9' "$f" && grep -qx 'model = "m"' "$f" || ok=0
+  for t in $SEVEN_ASK; do [ "$(codex_mode "$f" "$t")" = 'approval_mode = "prompt"' ] || ok=0; done
+  rm -rf "$h"
+  [ "$ok" -eq 1 ]
+}
+codex_setup_refuses() {
+  local h ok=1 body
+  h=$(mktemp -d) || return 1
+  for body in '[plugins."alynki@alynki-marketplace"]\nmcp_servers = {}\n' "[plugins.'alynki@alynki-marketplace']\n" '[plugins."alynki@alynki-marketplace"]\nx = """\n"""\n' '[mcp_servers.other]\n'; do
+    printf '%b' "$body" >"$h/config.toml"; cp "$h/config.toml" "$h/before"
+    if CODEX_HOME=$h sh "$CODEXSET" >/dev/null 2>&1; then ok=0; fi
+    cmp -s "$h/before" "$h/config.toml" || ok=0
+  done
+  rm -rf "$h"
+  [ "$ok" -eq 1 ]
+}
+ok "the Codex manifest names Codex's own setup skill, which runs setup.sh" codex_manifest_names_its_skill
+ok "Codex setup allows the 37, makes the seven ask, keeps the rest, and a second run changes nothing" codex_setup_idempotent
+ok "Codex setup writes nothing to a config it cannot edit safely, or without the plugin" codex_setup_refuses
 ok "the standard plugin's version is at least 0.33.1, the release of the Codex root layout" version_at_least "$STD" 0.33.1
 ok "the standard plugin's version is at least 0.29.1, the release of the Codex hook file" version_at_least "$STD" 0.29.1
 ok "the Codex manifest names hooks/codex-hooks.json, which exists" codex_manifest_names_its_hooks
@@ -344,7 +381,7 @@ copilot_manifest_is_agent_plugins() {
 }
 copilot_old_files_are_gone() { [ -s "$COPHOOKS" ] && [ ! -e alynki-plugin/hooks/copilot-hooks.json ] && [ ! -e alynki-plugin/copilot-mcp.json ]; }
 copilot_hooks_are_flat_version_1() {
-  jq -e '.version == 1 and (.hooks | keys | sort) == ["sessionStart","subagentStart"] and ([.hooks[][] | has("hooks") | not] | all) and ([.hooks[][] | .type == "command" and (.timeoutSec | type == "number")] | all)' "$COPHOOKS" >/dev/null
+  jq -e '.version == 1 and (.hooks | keys | sort) == ["permissionRequest","preToolUse","sessionStart","subagentStart"] and ([.hooks[][] | has("hooks") | not] | all) and ([.hooks[][] | .type == "command" and (.timeoutSec | type == "number")] | all)' "$COPHOOKS" >/dev/null
 }
 # shellcheck disable=SC2016 # ${PLUGIN_ROOT} is literal text in the hook command
 copilot_hooks_use_the_shared_script() {
@@ -373,7 +410,7 @@ antigravity_hooks_are_named_groups() {
 ok "the Copilot root plugin.json carries the Claude manifest's name and version" copilot_manifest_matches
 ok "the root plugin.json is an Agent Plugins v1.0.0 manifest: the schema, no field outside the specification, MIT" copilot_manifest_is_agent_plugins
 ok "the Copilot hooks sit at com.github.copilot/hooks/hooks.json, and copilot-hooks.json and copilot-mcp.json are gone" copilot_old_files_are_gone
-ok "the Copilot hooks file is version 1, flat, with sessionStart and subagentStart command entries and a timeout" copilot_hooks_are_flat_version_1
+ok "the Copilot hooks file is version 1, flat, with sessionStart, subagentStart, permissionRequest and preToolUse command entries and a timeout" copilot_hooks_are_flat_version_1
 ok "the Copilot hooks run the shared script with the copilot shape (sh \"\${PLUGIN_ROOT}/hooks/session-start.sh\" copilot session|subagent)" copilot_hooks_use_the_shared_script
 ok "the Copilot hook commands print the script's output (run from outside the plugin, PLUGIN_ROOT set)" copilot_hook_commands_print_the_output
 ok "session-start.sh copilot prints exactly one top-level key, additionalContext, for both events" copilot_output_is_exactly_additional_context
@@ -397,19 +434,40 @@ no_second_copy() {
     if grep -rlw --exclude-dir=.git --exclude=tools.txt --exclude=ask-tools.txt --exclude=README.md --exclude=load-first.md -- "$t" alynki-plugin .claude-plugin | grep -q .; then return 1; fi
   done
 }
-# Run the Antigravity script under a temporary HOME holding other settings and the allow rules 0.29 wrote for two of
-# the seven: it merges the 37, removes the seven's allow rules, and a second run is byte-identical.
+# Run the Antigravity script under a temporary HOME holding other settings, an allow rule for one of the seven, an ask
+# rule for one of the 37 and an old rule under the server name alynki: under alynki_alynki it allows the 37, asks for the
+# seven and removes the wrong-way rules, and a second run is byte-identical.
 agy_idempotent() {
   local h f a ok=1
   h=$(mktemp -d) || return 1
   f=$h/.gemini/antigravity-cli/settings.json
   mkdir -p "$(dirname "$f")"
-  printf '{"theme":"dark","permissions":{"deny":["command(sudo)"],"allow":["command(git)","mcp(alynki/grant_principal)","mcp(alynki/revoke_principal_agent)"]}}' >"$f"
+  printf '{"theme":"dark","permissions":{"deny":["command(sudo)"],"ask":["command(rm)","mcp(alynki_alynki/load_context)"],"allow":["command(git)","mcp(alynki/load_context)","mcp(alynki_alynki/grant_principal)"]}}' >"$f"
   HOME=$h sh "$AGYSET" >/dev/null && cp "$f" "$h/first" && HOME=$h sh "$AGYSET" >/dev/null && cmp -s "$h/first" "$f" &&
     [ "$(jq -r '.theme' "$f")" = dark ] && [ "$(jq -c '.permissions.deny' "$f")" = '["command(sudo)"]' ] &&
-    [ "$(jq -r '.permissions.allow[0]' "$f")" = 'command(git)' ] && [ "$(jq -r '[.permissions.allow[] | select(startswith("mcp(alynki/"))] | length' "$f")" -eq 37 ] &&
-    [ "$(jq -r '.permissions.allow | length' "$f")" -eq 38 ] || ok=0
-  for a in $SEVEN; do jq -e --arg r "mcp(alynki/$a)" '.permissions.allow | index($r) == null' "$f" >/dev/null || ok=0; done
+    [ "$(jq -c '.permissions.allow[0:2]' "$f")" = '["command(git)","mcp(alynki/load_context)"]' ] &&
+    [ "$(jq -r '[.permissions.allow[] | select(startswith("mcp(alynki_alynki/"))] | length' "$f")" -eq 37 ] &&
+    [ "$(jq -r '.permissions.allow | length' "$f")" -eq 39 ] &&
+    [ "$(jq -r '.permissions.ask[0]' "$f")" = 'command(rm)' ] && [ "$(jq -r '.permissions.ask | length' "$f")" -eq 8 ] || ok=0
+  for a in $SEVEN; do jq -e --arg r "mcp(alynki_alynki/$a)" '(.permissions.allow | index($r)) == null and (.permissions.ask | index($r)) != null' "$f" >/dev/null || ok=0; done
+  rm -rf "$h"
+  [ "$ok" -eq 1 ]
+}
+# A leftover allow rule under the old global server name alynki for one of the seven, or a wildcard, is named to the
+# person and left in place (#3677 AC 3, review R8); a clean file prints no such report.
+agy_reports_leftover_allow() {
+  local h f out ok=1
+  h=$(mktemp -d) || return 1
+  f=$h/.gemini/antigravity-cli/settings.json
+  mkdir -p "$(dirname "$f")"
+  printf '{"permissions":{"allow":["mcp(alynki/grant_principal)","mcp(alynki/load_context)","mcp(alynki/*)"]}}' >"$f"
+  out=$(HOME=$h sh "$AGYSET") || ok=0
+  printf '%s' "$out" | grep -qF 'let tools that change who has access run without asking' &&
+    printf '%s' "$out" | grep -qxF 'mcp(alynki/grant_principal)' && printf '%s' "$out" | grep -qxF 'mcp(alynki/*)' &&
+    ! printf '%s' "$out" | grep -qxF 'mcp(alynki/load_context)' &&
+    jq -e '.permissions.allow | index("mcp(alynki/grant_principal)") != null' "$f" >/dev/null || ok=0
+  rm -rf "$h"; h=$(mktemp -d) || return 1
+  out=$(HOME=$h sh "$AGYSET") && ! printf '%s' "$out" | grep -qF 'run without asking' || ok=0
   rm -rf "$h"
   [ "$ok" -eq 1 ]
 }
@@ -436,6 +494,7 @@ ok "the Antigravity script reads the asking list (ask-tools.txt)" grep -qF 'ask-
 ok "no tool name outside the list file appears in the plugin's skill, scripts or manifests (no second copy)" no_second_copy
 ok "the Antigravity script merges and is idempotent under a temporary HOME (two runs, cmp)" agy_idempotent
 ok "the Antigravity script leaves an unparseable settings file untouched" agy_refuses_bad_json
+ok "the Antigravity script names a leftover allow rule of the global alynki server, or a wildcard, that lets one of the seven run unprompted (#3677)" agy_reports_leftover_allow
 ok "both READMEs describe the setup per client and the shared list" bash -c 'grep -qF tools.txt README.md && grep -qF setup-antigravity.sh README.md && grep -qF setup-antigravity.sh alynki-plugin/README.md'
 ok "both READMEs say the seven access-changing tools ask (ask-tools.txt)" bash -c 'grep -qF ask-tools.txt README.md && grep -qF ask-tools.txt alynki-plugin/README.md'
 ok "the standard plugin's version is at least 0.30.0, the release in which the seven ask again" version_at_least "$STD" 0.30.0
@@ -564,7 +623,7 @@ ok "the Cursor marketplace lists alynki alone, from a folder that exists" cursor
 ok "both READMEs show Cursor's block (CLIENT_ID alynki-cursor, ~/.cursor/mcp.json) and link to alynki.com/docs" readmes_show_the_cursor_block
 CURHOOKS=alynki-plugin/hooks/cursor-hooks.json
 cursor_hooks_use_the_cursor_shape() {
-  [ "$(jq -r .hooks "$CUR")" = "./hooks/cursor-hooks.json" ] && [ "$(jq -r '.hooks | keys | join(",")' "$CURHOOKS")" = sessionStart,subagentStart ] &&
+  [ "$(jq -r .hooks "$CUR")" = "./hooks/cursor-hooks.json" ] && [ "$(jq -r '.hooks | keys | join(",")' "$CURHOOKS")" = beforeMCPExecution,sessionStart,subagentStart ] &&
     [ "$(jq -r '.hooks.sessionStart[0].command' "$CURHOOKS")" = 'sh "${CURSOR_PLUGIN_ROOT}"/hooks/session-start.sh cursor session' ] &&
     [ "$(jq -r '.hooks.subagentStart[0].command' "$CURHOOKS")" = 'sh "${CURSOR_PLUGIN_ROOT}"/hooks/session-start.sh cursor subagent' ]
 }
@@ -572,7 +631,7 @@ cursor_output_is_additional_context_only() {
   local e
   for e in session subagent; do
     sh alynki-plugin/hooks/session-start.sh cursor "$e" </dev/null |
-      jq -e --rawfile w alynki-plugin/hooks/load-first.md 'keys == ["additional_context"] and .additional_context + "\n" == $w' >/dev/null || return 1
+      jq -e --rawfile w alynki-plugin/hooks/load-first.md 'keys == ["additional_context"] and .additional_context == ($w | rtrimstr("\n"))' >/dev/null || return 1
   done
 }
 cursor_logo_is_the_listing_icon() { [ "$(jq -r .logo "$CUR")" = "./assets/logo.png" ] && cmp -s alynki-plugin/assets/logo.png alynki-plugin/.claude-plugin/icon.png; }
@@ -588,22 +647,220 @@ ok "the READMEs claim no Cursor Marketplace or Grok catalog listing" readmes_cla
 # The permission hint (alynki/alynki#3582): the server's refusal no longer names /alynki:setup, so the shared hook text tells the person
 # how to allow Alynki's tools in each client, in one paragraph every client reads. Each shape's session and subagent output must carry it.
 # The count it names is the length of tools.txt.
-hint_in() { # <shape> <event>: the printed output, once decoded, holds the whole hint
+hint_in() { # <shape> <event>: the printed output, once decoded, holds the one hint, naming each client's setup (alynki/alynki#3680)
   local out
   out=$(sh alynki-plugin/hooks/session-start.sh "$1" "$2" </dev/null) || return 1
   printf '%s' "$out" | grep -qF 'If load_context is refused for permission, do not retry.' &&
-    printf '%s' "$out" | grep -qF 'In Claude Code: run /alynki:setup, which allows '"$(grep -c . "$LIST")"' of Alynki' &&
-    printf '%s' "$out" | grep -qF 'In Antigravity CLI: run sh bin/setup-antigravity.sh' &&
-    printf '%s' "$out" | grep -qF 'In Codex CLI and in GitHub Copilot (VS Code or CLI): allow Alynki' &&
+    printf '%s' "$out" | grep -qF 'in Claude Code, GitHub Copilot CLI and Grok Build, /alynki:setup;' &&
+    printf '%s' "$out" | grep -qF 'in Codex CLI, $alynki:setup;' &&
+    printf '%s' "$out" | grep -qF 'in Antigravity CLI, /setup;' &&
+    printf '%s' "$out" | grep -qF 'in Cursor, /alynki-setup, then use Run Mode Allowlist;' &&
+    printf '%s' "$out" | grep -qF 'in VS Code, allow Alynki' &&
+    printf '%s' "$out" | grep -qF "Setup allows $(grep -c . "$LIST") of Alynki" &&
+    printf '%s' "$out" | grep -qF "and the $(grep -c . "$ASKLIST") that change who has access still ask each time." &&
     printf '%s' "$out" | grep -qF 'If no user is present, end the session.'
 }
-ok "the Claude hook output (session and subagent) carries the permission hint: /alynki:setup, the 37 tools of tools.txt" bash -c "$(declare -f hint_in); LIST=$LIST; hint_in claude session && hint_in claude subagent"
-ok "the Codex hook output (session and subagent) carries the permission hint" bash -c "$(declare -f hint_in); LIST=$LIST; hint_in codex session && hint_in codex subagent"
-ok "the Antigravity session output carries the permission hint (setup-antigravity.sh)" bash -c "$(declare -f hint_in); LIST=$LIST; hint_in antigravity session"
-ok "the Copilot hook output (session and subagent) carries the permission hint" bash -c "$(declare -f hint_in); LIST=$LIST; hint_in copilot session && hint_in copilot subagent"
+ok "the Claude hook output (session and subagent) carries the one permission hint, its counts from tools.txt and ask-tools.txt" bash -c "$(declare -f hint_in); LIST=$LIST; ASKLIST=$ASKLIST; hint_in claude session && hint_in claude subagent"
+ok "the Codex hook output (session and subagent) carries the permission hint" bash -c "$(declare -f hint_in); LIST=$LIST; ASKLIST=$ASKLIST; hint_in codex session && hint_in codex subagent"
+ok "the Antigravity session output carries the permission hint (/setup)" bash -c "$(declare -f hint_in); LIST=$LIST; ASKLIST=$ASKLIST; hint_in antigravity session"
+ok "the Copilot hook output (session and subagent) carries the permission hint" bash -c "$(declare -f hint_in); LIST=$LIST; ASKLIST=$ASKLIST; hint_in copilot session && hint_in copilot subagent"
+ok "the Cursor hook output (session and subagent) carries the permission hint" bash -c "$(declare -f hint_in); LIST=$LIST; ASKLIST=$ASKLIST; hint_in cursor session && hint_in cursor subagent"
 ok "the standard plugin's version is at least 0.32.0, the release of the permission hint" version_at_least "$STD" 0.32.0
 ok "the standard plugin's version is at least 0.33.0, the release of the Agent Plugins manifest" version_at_least "$STD" 0.33.0
-ok "the hint's setup script exists and is the one the READMEs name" bash -c 'test -f alynki-plugin/bin/setup-antigravity.sh && grep -qF "bin/setup-antigravity.sh" alynki-plugin/hooks/load-first.md && grep -qF setup-antigravity.sh alynki-plugin/README.md'
+ok "the hint's setup script exists and is the one the READMEs name" bash -c 'test -f alynki-plugin/bin/setup-antigravity.sh && grep -qF "bin/setup-antigravity.sh" alynki-plugin/skills/setup/antigravity.md && grep -qF setup-antigravity.sh alynki-plugin/README.md'
+
+# GitHub Copilot setup (alynki/alynki#3487): /alynki:setup writes a marker; a permissionRequest hook then allows every Alynki tool.
+CPA=alynki-plugin/com.github.copilot/hooks/allow-tools.sh
+CPS=alynki-plugin/bin/setup-copilot.sh
+# cp_ask <home> <toolName> [toolInput]: the hook's stdout for one permission request, shaped as Copilot CLI 1.0.115 sends it.
+cp_ask() {
+  printf '{"hookName":"permissionRequest","cwd":"/x","toolName":"%s","toolInput":%s,"permissionSuggestions":[]}' "$2" "${3:-{\}}" | COPILOT_HOME=$1 sh "$CPA"
+}
+copilot_asks_before_setup() { local d; d=$(mktemp -d); [ -z "$(cp_ask "$d" alynki/load_context)" ]; }
+copilot_allows_every_tool_after_setup() {
+  local d t; d=$(mktemp -d); COPILOT_HOME=$d sh "$CPS" >/dev/null || return 1
+  for t in $(cat "$LIST"); do [ "$(cp_ask "$d" "alynki/$t")" = '{"behavior":"allow"}' ] || return 1; done
+  for t in $(cat "$ASKLIST"); do [ -z "$(cp_ask "$d" "alynki/$t")" ] || return 1; done
+}
+# cp_pre <toolName>: the preToolUse hook's decision for one call.
+cp_pre() { printf '{"cwd":"/x","toolName":"%s","toolArgs":{}}' "$1" | sh "$CPA" ask | jq -r '.permissionDecision // empty'; }
+copilot_seven_always_ask() {
+  local t
+  for t in $(cat "$ASKLIST"); do [ "$(cp_pre "alynki-$t")" = ask ] || return 1; done
+  for t in $(cat "$LIST") ; do [ -z "$(cp_pre "alynki-$t")" ] || return 1; done
+  [ -z "$(cp_pre bash)" ]
+}
+copilot_allows_nothing_else() {
+  local d t; d=$(mktemp -d); COPILOT_HOME=$d sh "$CPS" >/dev/null || return 1
+  for t in bash alynki/not_a_tool alynki-x/load_context other/load_context; do [ -z "$(cp_ask "$d" "$t")" ] || return 1; done
+  [ -z "$(cp_ask "$d" bash '{"toolName":"alynki/load_context"}')" ]
+}
+copilot_second_setup_changes_nothing() {
+  local d a; d=$(mktemp -d); COPILOT_HOME=$d sh "$CPS" >/dev/null || return 1
+  a=$(ls -lT "$d" 2>/dev/null || ls -l --full-time "$d")
+  sleep 1
+  COPILOT_HOME=$d sh "$CPS" | grep -q 'nothing changed' && [ "$a" = "$(ls -lT "$d" 2>/dev/null || ls -l --full-time "$d")" ]
+}
+copilot_undo_asks_again() { local d; d=$(mktemp -d); COPILOT_HOME=$d sh "$CPS" >/dev/null && COPILOT_HOME=$d sh "$CPS" --undo >/dev/null && [ -z "$(cp_ask "$d" alynki/load_context)" ]; }
+copilot_permission_hook_is_declared() {
+  jq -e '(.hooks.preToolUse | length == 1 and .[0].matcher == "alynki-.*" and (.[0].command | endswith("allow-tools.sh\" ask"))) and (.hooks.permissionRequest | length == 1 and .[0].matcher == "alynki/.*" and (.[0].command | contains("com.github.copilot/hooks/allow-tools.sh")))' alynki-plugin/com.github.copilot/hooks/hooks.json
+}
+ok "Copilot: nothing is allowed before setup" copilot_asks_before_setup
+ok "Copilot: after setup every tool of tools.txt is allowed and none of ask-tools.txt" copilot_allows_every_tool_after_setup
+ok "Copilot: preToolUse makes every tool of ask-tools.txt ask, and no other" copilot_seven_always_ask
+ok "Copilot: after setup no other server, tool or argument-borne name is allowed" copilot_allows_nothing_else
+ok "Copilot: a second setup changes nothing" copilot_second_setup_changes_nothing
+ok "Copilot: --undo asks again" copilot_undo_asks_again
+ok "Copilot: the permissionRequest hook is declared for the alynki server only" copilot_permission_hook_is_declared
+ok "Copilot: the setup skill sends Copilot to bin/setup-copilot.sh" grep -qF 'bin/setup-copilot.sh' "$SKILL"
+
+# Cursor's setup (alynki/alynki#3686): /alynki-setup, its own skills folder, an exact-name allowlist and an ask hook for the seven.
+CURSKILL=alynki-plugin/cursor/skills/alynki-setup/SKILL.md
+cursor_lists_its_own_setup_skill() {
+  [ "$(jq -r .skills "$CUR")" = "./cursor/skills/" ] && grep -qx 'name: alynki-setup' "$CURSKILL" && grep -qF 'cursor/setup.sh' "$CURSKILL" &&
+    [ "$(find alynki-plugin/cursor/skills -name SKILL.md | wc -l | tr -d ' ')" -eq 1 ]
+}
+cursor_setup() { HOME=$1 sh alynki-plugin/cursor/setup.sh; }
+# A HOME with another entry, another key, an exact and a wildcard entry covering the seven on this server, and a wider one.
+cursor_setup_writes_the_lists() {
+  local h out s=plugin-alynki-alynki
+  h=$(mktemp -d) || return 1
+  mkdir -p "$h/.cursor"
+  printf '{"mcpAllowlist":["other:tool","%s:grant_principal","%s:revoke_*","*:invite_*"],"terminalAllowlist":["ls"]}\n' "$s" "$s" >"$h/.cursor/permissions.json"
+  out=$(cursor_setup "$h") &&
+    jq -e --rawfile t "$LIST" --arg s "$s" '.terminalAllowlist == ["ls"] and .mcpAllowlist == ["other:tool","*:invite_*"] + ($t | split("\n") | map(select(length > 0) | $s + ":" + .))' "$h/.cursor/permissions.json" >/dev/null &&
+    printf '%s' "$out" | grep -qF 'WARNING: the allow entry "*:invite_*" also covers invite_principal' &&
+    cp "$h/.cursor/permissions.json" "$h/first" && cursor_setup "$h" | grep -qF 'already set up' && cmp -s "$h/first" "$h/.cursor/permissions.json"
+  local r=$?; rm -rf "$h"; return $r
+}
+cursor_setup_from_nothing_allows_37() {
+  local h r
+  h=$(mktemp -d) || return 1
+  cursor_setup "$h" >/dev/null && [ "$(jq '.mcpAllowlist | length' "$h/.cursor/permissions.json")" -eq 37 ] && ! cursor_setup "$h" | grep -q WARNING
+  r=$?; rm -rf "$h"; return $r
+}
+cursor_setup_refuses_comments() {
+  local h r
+  h=$(mktemp -d) || return 1
+  mkdir -p "$h/.cursor"
+  printf '{\n  // mine\n  "mcpAllowlist": []\n}\n' >"$h/.cursor/permissions.json"
+  cp "$h/.cursor/permissions.json" "$h/first"
+  ! cursor_setup "$h" >/dev/null 2>&1 && cmp -s "$h/first" "$h/.cursor/permissions.json"
+  r=$?; rm -rf "$h"; return $r
+}
+cursor_ask() { printf '{"mcp_server_name":"%s","tool_name":"%s"}' "$1" "$2" | sh -c "CURSOR_PLUGIN_ROOT=$PWD/alynki-plugin; $(jq -r '.hooks.beforeMCPExecution[0].command' "$CURHOOKS")"; }
+cursor_hook_asks_for_the_seven_only() {
+  local t
+  while IFS= read -r t; do [ "$(cursor_ask plugin-alynki-alynki "$t" | jq -r .permission)" = ask ] || return 1; done <"$ASKLIST"
+  while IFS= read -r t; do [ "$(cursor_ask plugin-alynki-alynki "$t")" = '{}' ] || return 1; done <"$LIST"
+  [ "$(cursor_ask other grant_principal)" = '{}' ]
+}
+ok "Cursor lists one setup skill of its own, alynki-setup, which runs cursor/setup.sh" cursor_lists_its_own_setup_skill
+ok "cursor/setup.sh allows the 37, removes this server's entries covering the seven, keeps the rest, warns on a wider one and changes nothing twice" cursor_setup_writes_the_lists
+ok "cursor/setup.sh on an empty HOME writes exactly 37 entries and no warning" cursor_setup_from_nothing_allows_37
+ok "cursor/setup.sh refuses a permissions.json with comments and leaves it untouched" cursor_setup_refuses_comments
+# The seven ask only in Run Mode Allowlist (founder decision on #3686, 2026-11-25): setup's message and both READMEs say so.
+cursor_says_run_mode_allowlist() {
+  local h; h=$(mktemp -d) || return 1
+  cursor_setup "$h" | grep -qF 'The seven ask only in Run Mode "Allowlist"' &&
+    grep -F '| Cursor |' README.md | grep -qF 'Allowlist. In Auto-review' &&
+    grep -qF 'The seven ask only in [Run Mode](https://cursor.com/docs/agent/security/run-modes) Allowlist' alynki-plugin/README.md
+}
+ok "Cursor: setup's message and both READMEs say the seven ask only in Run Mode Allowlist (#3686)" cursor_says_run_mode_allowlist
+# VS Code has no scriptable allowlist (alynki/alynki#3683): both READMEs give the manual step and the first-prompt timing.
+vscode_manual_step() {
+  grep -F '| VS Code |' README.md | grep -qF 'Always Allow' && grep -F '| VS Code |' README.md | grep -qF 'Allow Once' &&
+    grep -F '| VS Code |' README.md | grep -qF 'first message waits' &&
+    grep -F -- '- **VS Code:**' alynki-plugin/README.md | grep -qF 'Always Allow' && grep -F -- '- **VS Code:**' alynki-plugin/README.md | grep -qF 'first chat message waits'
+}
+ok "VS Code: both READMEs give the manual approval step and the first-prompt timing (#3683)" vscode_manual_step
+ok "the Cursor beforeMCPExecution hook answers ask for the seven of Alynki's server and nothing else" cursor_hook_asks_for_the_seven_only
+
+# Grok Build (alynki/alynki#3685). It installs the repository root: a root plugin.json in the installed folder wins over
+# .grok-plugin/plugin.json (Grok 1.0.92), and alynki-plugin/ has one.
+GROK=.grok-plugin/plugin.json
+GROKDIR=alynki-plugin/grok
+grok_manifest() {
+  [ ! -e plugin.json ] && [ "$(jq -r .name "$GROK")" = alynki ] && [ "$(jq -r .version "$GROK")" = "$(jq -r .version "$STD")" ] &&
+    [ -f "$(jq -r .skills "$GROK")setup/SKILL.md" ] && [ -f "$(jq -r .mcpServers "$GROK")" ] && [ -f "$(jq -r .hooks "$GROK")" ]
+}
+grok_marketplace_installs_the_root() {
+  jq -e '.name == "alynki-marketplace" and [.plugins[].name] == ["alynki"] and .plugins[0].source == {"source": "url", "url": "https://github.com/alynki/plugin.git"}' .grok-plugin/marketplace.json >/dev/null
+}
+grok_server_and_client() { jq -e --arg u "$MCP_URL" '.mcpServers.alynki | .url == $u and .oauth.clientId == "alynki-grok"' "$GROKDIR/mcp.json" >/dev/null; }
+grok_hook_matches_the_asking_tools() {
+  [ "$(jq -r '.hooks | keys | join(",")' "$GROKDIR/hooks.json")" = PreToolUse ] && jq -e '.hooks.PreToolUse[0].hooks[0].failClosed' "$GROKDIR/hooks.json" >/dev/null &&
+    [ "$(jq -r '.hooks.PreToolUse[0].matcher' "$GROKDIR/hooks.json")" = "^($(sed 's/^/alynki__/' "$ASKLIST" | paste -sd'|' -))\$" ]
+}
+grok_hook_decision() { printf '%s' "$1" | CLAUDE_PLUGIN_ROOT='' GROK_PLUGIN_ROOT=$PWD sh -c "$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$GROKDIR/hooks.json")" | jq -r .decision; }
+grok_hook_asks() { [ "$(grok_hook_decision '{"permissionMode":"default"}')" = ask ] && [ "$(grok_hook_decision '{"permissionMode": "auto"}')" = ask ]; }
+grok_hook_refuses_in_always_approve() { [ "$(grok_hook_decision '{"permissionMode":"bypassPermissions"}')" = deny ]; }
+# grok_run <home> [args]: setup.sh against that folder as GROK_HOME.
+grok_run() {
+  local h=$1
+  shift
+  GROK_HOME=$h sh "$GROKDIR/setup.sh" "$@" >/dev/null
+}
+# grok_rules <config> <action>: the sorted tool names of that action's [[permission.rules]] entries.
+grok_rules() { awk -F'"' -v a="$2" '/^action = / { act = $2 } /^pattern = "alynki__/ && act == a { sub(/^alynki__/, "", $2); print $2 }' "$1" | sort; }
+grok_setup_writes_the_lists() {
+  local d
+  d=$(mktemp -d) && grok_run "$d" && [ "$(grok_rules "$d/config.toml" allow)" = "$(sort "$LIST")" ] && [ "$(grok_rules "$d/config.toml" ask)" = "$(sort "$ASKLIST")" ] &&
+    [ "$(head -c "$(wc -c <alynki-plugin/hooks/load-first.md)" "$d/rules/alynki-load-context.md")" = "$(cat alynki-plugin/hooks/load-first.md)" ]
+}
+grok_second_run_changes_nothing() {
+  local d
+  d=$(mktemp -d) && grok_run "$d" && cp "$d/config.toml" "$d/first" && grok_run "$d" && cmp -s "$d/first" "$d/config.toml" &&
+    grep -v '^#' "$d/first" >"$d/config.toml" && cp "$d/config.toml" "$d/rewritten" && grok_run "$d" && cmp -s "$d/rewritten" "$d/config.toml"
+}
+grok_keeps_the_users_entries() {
+  local d
+  d=$(mktemp -d) || return 1
+  printf '[ui]\nx = 1\n\n[[permission.rules]]\naction = "deny"\ntool = "mcp"\npattern = "alynki__delete_run"\n\n[[permission.rules]]\naction = "allow"\ntool = "mcp"\npattern = "alynki__grant_principal"\n\n[[permission.rules]]\naction = "allow"\ntool = "bash"\npattern = "git *"\n' >"$d/config.toml"
+  grok_run "$d" && grep -qx 'x = 1' "$d/config.toml" && grep -qx 'pattern = "git \*"' "$d/config.toml" &&
+    [ "$(grok_rules "$d/config.toml" deny)" = delete_run ] && [ "$(grok_rules "$d/config.toml" allow)" = "$(sort "$LIST")" ]
+}
+grok_refuses_what_it_cannot_edit() {
+  local d text
+  for text in 'x = """\n"""' 'permission = { deny = [] }' '[permission]\nrules = []' '[permission.rules]'; do
+    d=$(mktemp -d) || return 1
+    # shellcheck disable=SC2059 # the text holds the newlines
+    printf "$text\n" >"$d/config.toml" && cp "$d/config.toml" "$d/was" || return 1
+    if grok_run "$d" 2>/dev/null; then return 1; fi
+    cmp -s "$d/was" "$d/config.toml" && [ ! -e "$d/rules/alynki-load-context.md" ] || return 1
+  done
+}
+# Grok's MCP result limit applies to every server, and an Alynki page fits its 20,000-byte default (alynki/alynki#3672): setup
+# adds no max_output_bytes and keeps one the person set.
+grok_output_limit() {
+  local d
+  d=$(mktemp -d) && printf '[mcp]\nfoo = 1\n' >"$d/config.toml" && grok_run "$d" && [ "$(grep -c '^\[mcp\]' "$d/config.toml")" -eq 1 ] && ! grep -q max_output_bytes "$d/config.toml" &&
+    d=$(mktemp -d) && grok_run "$d" && ! grep -q max_output_bytes "$d/config.toml" && ! grok_run "$d" | grep -qF max_output_bytes &&
+    d=$(mktemp -d) && printf '[mcp]\nmax_output_bytes = 90000\n' >"$d/config.toml" && grok_run "$d" && [ "$(grep -c max_output_bytes "$d/config.toml")" -eq 1 ] && grep -qx 'max_output_bytes = 90000' "$d/config.toml"
+}
+grok_undo() {
+  local d
+  d=$(mktemp -d) && printf '[ui]\nx = 1\n' >"$d/config.toml" && grok_run "$d" && grok_run "$d" --undo && ! grep -q -e alynki__ -e max_output_bytes "$d/config.toml" && grep -qx 'x = 1' "$d/config.toml" && [ ! -e "$d/rules/alynki-load-context.md" ]
+}
+grok_skill_is_user_invoked() { grep -qx 'disable-model-invocation: true' "$GROKDIR/skills/setup/SKILL.md" && grep -qF '${GROK_PLUGIN_ROOT}/alynki-plugin/grok/setup.sh' "$GROKDIR/skills/setup/SKILL.md"; }
+readmes_cover_grok() {
+  local f
+  for f in README.md "$PLUGIN_README"; do grep -qF 'grok plugin install alynki/plugin --trust' "$f" && ! grep -qF 'max_output_bytes = 40000' "$f" && ! grep -qF 'to 40000' "$f" || return 1; done
+}
+ok "the Grok manifest at the root carries the version and names files that exist" grok_manifest
+ok "the Grok marketplace file installs the repository root" grok_marketplace_installs_the_root
+ok "Grok connects to the one address with its own client, alynki-grok (#3685)" grok_server_and_client
+ok "the Grok hook is PreToolUse alone, fails closed and matches exactly ask-tools.txt" grok_hook_matches_the_asking_tools
+ok "the Grok hook asks in default and auto mode" grok_hook_asks
+ok "the Grok hook refuses in always-approve mode" grok_hook_refuses_in_always_approve
+ok "Grok setup allows tools.txt, asks for ask-tools.txt and writes the load-first rule" grok_setup_writes_the_lists
+ok "Grok setup changes nothing on a second run, also after Grok drops comments" grok_second_run_changes_nothing
+ok "Grok setup keeps the user's rules and replaces an allow on an asking tool" grok_keeps_the_users_entries
+ok "Grok setup writes nothing into a config it cannot edit safely" grok_refuses_what_it_cannot_edit
+ok "Grok setup adds no output limit and keeps the user's own (#3685, once #3672 is live)" grok_output_limit
+ok "Grok setup --undo removes what it wrote and nothing else" grok_undo
+ok "the Grok setup skill runs only when the user invokes it" grok_skill_is_user_invoked
+ok "both READMEs give the Grok install command and no longer raise the output limit" readmes_cover_grok
 
 echo "$n assertions, $failed failed"
 [ "$failed" -eq 0 ] || exit 1
