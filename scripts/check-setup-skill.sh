@@ -522,6 +522,28 @@ ok "the Cursor manifest is named alynki, carries the Claude manifest's version a
 ok "cursor-mcp.json names https://mcp.alynki.com/mcp with auth CLIENT_ID alynki-cursor and no secret" cursor_mcp_is_the_public_client
 ok "the Cursor marketplace lists alynki alone, from a folder that exists" cursor_marketplace_lists_alynki
 ok "both READMEs show Cursor's block (CLIENT_ID alynki-cursor, ~/.cursor/mcp.json) and link to alynki.com/docs" readmes_show_the_cursor_block
+CURHOOKS=alynki-plugin/hooks/cursor-hooks.json
+cursor_hooks_use_the_cursor_shape() {
+  [ "$(jq -r .hooks "$CUR")" = "./hooks/cursor-hooks.json" ] && [ "$(jq -r '.hooks | keys | join(",")' "$CURHOOKS")" = sessionStart,subagentStart ] &&
+    [ "$(jq -r '.hooks.sessionStart[0].command' "$CURHOOKS")" = 'sh "${CURSOR_PLUGIN_ROOT}"/hooks/session-start.sh cursor session' ] &&
+    [ "$(jq -r '.hooks.subagentStart[0].command' "$CURHOOKS")" = 'sh "${CURSOR_PLUGIN_ROOT}"/hooks/session-start.sh cursor subagent' ]
+}
+cursor_output_is_additional_context_only() {
+  local e
+  for e in session subagent; do
+    sh alynki-plugin/hooks/session-start.sh cursor "$e" </dev/null |
+      jq -e --rawfile w alynki-plugin/hooks/load-first.md 'keys == ["additional_context"] and .additional_context + "\n" == $w' >/dev/null || return 1
+  done
+}
+cursor_logo_is_the_listing_icon() { [ "$(jq -r .logo "$CUR")" = "./assets/logo.png" ] && cmp -s alynki-plugin/assets/logo.png alynki-plugin/.claude-plugin/icon.png; }
+readmes_claim_no_unlisted_listing() {
+  grep -qF 'not yet listed in the Cursor Marketplace' README.md && grep -qF 'not yet listed in the Cursor Marketplace' "$PLUGIN_README" &&
+    grep -qF "not yet in Grok's connector catalog" README.md && ! grep -qF 'pick Alynki from the catalog' README.md && ! grep -qF 'open the Cursor Marketplace' README.md "$PLUGIN_README"
+}
+ok "the Cursor manifest names cursor-hooks.json, which runs session-start.sh cursor for sessionStart and subagentStart" cursor_hooks_use_the_cursor_shape
+ok "session-start.sh cursor prints exactly one key, additional_context, holding the wording, for both events" cursor_output_is_additional_context_only
+ok "the Cursor manifest's logo is the listing icon at assets/logo.png" cursor_logo_is_the_listing_icon
+ok "the READMEs claim no Cursor Marketplace or Grok catalog listing" readmes_claim_no_unlisted_listing
 
 # The permission hint (alynki/alynki#3582): the server's refusal no longer names /alynki:setup, so the shared hook text tells the person
 # how to allow Alynki's tools in each client, in one paragraph every client reads. Each shape's session and subagent output must carry it.

@@ -1,14 +1,14 @@
 #!/bin/sh
 # Prints the "call load_context first" wording as a client's hook output.
 #   session-start.sh <shape> <event>
-#   shape: claude (Claude Code), codex, antigravity, copilot
+#   shape: claude (Claude Code), codex, antigravity, copilot, cursor
 #   event: session, subagent
 # The wording lives only in load-first.md beside this script. Reads no stdin,
 # makes no network call. Needs only sh, sed and awk.
 set -eu
 
-shape=${1:?usage: session-start.sh <claude|codex|antigravity|copilot> <session|subagent>}
-event=${2:?usage: session-start.sh <claude|codex|antigravity|copilot> <session|subagent>}
+shape=${1:?usage: session-start.sh <claude|codex|antigravity|copilot|cursor> <session|subagent>}
+event=${2:?usage: session-start.sh <claude|codex|antigravity|copilot|cursor> <session|subagent>}
 here=$(cd "$(dirname "$0")" && pwd)
 
 # $(...) drops the file's trailing newline, so the text ends where the wording ends.
@@ -31,6 +31,8 @@ case "$shape:$event" in
   antigravity:subagent)
     # Antigravity has no subagent-start event; nothing to inject.
     printf '{}\n' ;;
+  cursor:session | cursor:subagent)
+    printf '{"additional_context": "%s"}\n' "$body" ;;
   copilot:session | copilot:subagent)
     printf '{"additionalContext": "%s"}\n' "$body" ;;
   *)
