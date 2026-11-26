@@ -342,6 +342,21 @@ codex_setup_idempotent() {
   rm -rf "$h"
   [ "$ok" -eq 1 ]
 }
+# Codex writes [hooks.state."alynki@alynki-marketplace:…"] tables when a person trusts the plugin's hooks (the form
+# Codex 0.172.0 wrote on a clean install, alynki/alynki#3681): setup runs, keeps them byte for byte, and a second
+# run changes nothing.
+codex_setup_keeps_hook_trust() {
+  local h f ok=1 p='plugins."alynki@alynki-marketplace"' k='alynki@alynki-marketplace:alynki-plugin/hooks/codex-hooks.json'
+  h=$(mktemp -d) || return 1
+  f=$h/config.toml
+  printf '[%s]\nenabled = true\n\n[hooks.state]\n\n[hooks.state."%s:session_start:0:0"]\ntrusted_hash = "sha256:aa"\ntrusted_content_hash = "sha256:bb"\n\n[hooks.state."%s:subagent_start:0:0"]\ntrusted_hash = "sha256:cc"\n' "$p" "$k" "$k" >"$f"
+  sed -n '/^\[hooks.state\]/,$p' "$f" >"$h/hooks"
+  CODEX_HOME=$h sh "$CODEXSET" >/dev/null 2>&1 && cp "$f" "$h/first" && CODEX_HOME=$h sh "$CODEXSET" >/dev/null 2>&1 && cmp -s "$h/first" "$f" &&
+    [ "$(grep -c '^approval_mode = "approve"$' "$f")" -eq 37 ] && [ "$(grep -c '^approval_mode = "prompt"$' "$f")" -eq 7 ] &&
+    awk '/^\[hooks.state\]/{on=1} on && /^\[plugins/{exit} on' "$f" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' | cmp -s - "$h/hooks" || ok=0
+  rm -rf "$h"
+  [ "$ok" -eq 1 ]
+}
 codex_setup_refuses() {
   local h ok=1 body
   h=$(mktemp -d) || return 1
@@ -356,6 +371,7 @@ codex_setup_refuses() {
 ok "the Codex manifest names Codex's own setup skill, which runs setup.sh" codex_manifest_names_its_skill
 ok "Codex setup allows the 37, makes the seven ask, keeps the rest, and a second run changes nothing" codex_setup_idempotent
 ok "Codex setup writes nothing to a config it cannot edit safely, or without the plugin" codex_setup_refuses
+ok "Codex setup runs with Codex's own hook-trust tables in the config, keeps them, and a second run changes nothing" codex_setup_keeps_hook_trust
 ok "the standard plugin's version is at least 0.33.1, the release of the Codex root layout" version_at_least "$STD" 0.33.1
 ok "the standard plugin's version is at least 0.29.1, the release of the Codex hook file" version_at_least "$STD" 0.29.1
 ok "the Codex manifest names hooks/codex-hooks.json, which exists" codex_manifest_names_its_hooks
