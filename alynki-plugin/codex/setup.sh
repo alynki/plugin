@@ -4,7 +4,8 @@
 # https://learn.chatgpt.com/docs/extend/mcp (Plugin-provided MCP servers).
 # Each tool in ../tools.txt gets approval_mode "approve"; each tool in ../ask-tools.txt gets "prompt", replacing
 # any "approve" an earlier run or an "always allow" wrote. A server default of "approve" is removed, so a tool
-# neither list names is not allowed by it. Touches nothing else; a second run changes nothing.
+# neither list names is not allowed by it. Touches nothing else; a second run changes nothing. Codex's own
+# [hooks.state…] tables, written when a person trusts the plugin's hooks, name the plugin too and are kept as they are.
 set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
 config=${CODEX_HOME:-$HOME/.codex}/config.toml
@@ -34,10 +35,11 @@ index($0, "\"\"\"") || index($0, "\047\047\047") { stop("The file holds a multi-
     section = "tool"; name = substr(h, length(prefix) + 1); sub(/\]$/, "", name); gsub(/["\047]/, "", name)
     if (name in mode) { seen[name] = 1; listed = 1; print; print "approval_mode = \"" mode[name] "\""; next }
   }
+  else if (index(h, "[hooks.state") == 1) section = "hooks"
   else if (index(h, "alynki@alynki-marketplace")) stop("An Alynki plugin table has a form this script does not edit")
   print; next
 }
-index($0, "alynki@alynki-marketplace") { stop("An Alynki plugin setting has a form this script does not edit") }
+section != "hooks" && index($0, "alynki@alynki-marketplace") { stop("An Alynki plugin setting has a form this script does not edit") }
 section == "plugin" && /^[ \t]*["\047]?mcp_servers/ { stop("The plugin table sets mcp_servers inline") }
 section == "server" && /^[ \t]*["\047]?tools/ { stop("The server table sets tools inline") }
 section == "server" && /^[ \t]*["\047]?default_tools_approval_mode["\047]?[ \t]*=[ \t]*["\047]approve["\047]/ { next }
