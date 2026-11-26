@@ -226,9 +226,11 @@ mcp_urls() {
   jq -r '.mcpServers.alynki.url' alynki-plugin/mcp.json alynki-plugin/mcp_config.json
 }
 mcp_urls_all_match() { [ "$(mcp_urls | wc -l | tr -d ' ')" -eq 3 ] && [ "$(mcp_urls | sort -u | wc -l | tr -d ' ')" -eq 1 ] && [ "$(mcp_urls | head -n1)" = "$MCP_URL" ]; }
-# The wording is found by two of its sentences; only load-first.md may hold them (this script is not scanned).
+# The wording is found by two of its sentences; only load-first.md and VS Code's rule, which is asserted to be
+# built from it, may hold them (this script is not scanned).
+COPRULE=alynki-plugin/com.github.copilot/rules/alynki-load-first.instructions.md
 wording_only_in_load_first() {
-  [ "$(grep -rlF --exclude-dir=.git --exclude-dir=scripts -e 'MANDATORY FIRST ACTION' -e 'PAGE TO COMPLETION' . | sort -u)" = "./alynki-plugin/hooks/load-first.md" ]
+  [ "$(grep -rlF --exclude-dir=.git --exclude-dir=scripts -e 'MANDATORY FIRST ACTION' -e 'PAGE TO COMPLETION' . | sort -u)" = "$(printf '%s\n%s' "./$COPRULE" ./alynki-plugin/hooks/load-first.md)" ]
 }
 versions_all_match() { [ "$(jq -r .version "$CODEX")" = "$(jq -r .version "$STD")" ] && [ "$(jq -r .version "$AGY")" = "$(jq -r .version "$STD")" ]; }
 names_all_match() { [ "$(jq -r .name "$CODEX")" = alynki ] && [ "$(jq -r .name "$AGY")" = alynki ]; }
@@ -252,7 +254,7 @@ readmes_cover_the_clients() {
   done
 }
 ok "every MCP file (.mcp.json, mcp.json, mcp_config.json) names the same url, https://mcp.alynki.com/mcp" mcp_urls_all_match
-ok "the hook wording exists in one place, hooks/load-first.md" wording_only_in_load_first
+ok "the hook wording is written once, in hooks/load-first.md, and copied only into VS Code's rule" wording_only_in_load_first
 ok "the Codex and Antigravity manifests carry the Claude manifest's version" versions_all_match
 ok "the Codex and Antigravity manifests are named alynki" names_all_match
 ok "the Codex mcp.json declares a transport type and a url" codex_mcp_declares_transport
@@ -432,6 +434,19 @@ ok "the Copilot hook commands print the script's output (run from outside the pl
 ok "session-start.sh copilot prints exactly one top-level key, additionalContext, for both events" copilot_output_is_exactly_additional_context
 ok "mcp.json is an Agent Plugins v1.0.0 MCP file: the schema and a streamable-http server with a url and nothing else" copilot_mcp_is_agent_plugins
 ok "the Antigravity root hooks.json is named groups with no Copilot keys, and its manifest has no hooks field" antigravity_hooks_are_named_groups
+# VS Code's Copilot agent discards a plugin's sessionStart output and runs no subagentStart (alynki/alynki#3809), so a
+# rule carries the wording there. It is the only rule file, named .instructions.md, which VS Code reads.
+vscode_rule_is_the_wording() {
+  [ "$(find alynki-plugin/com.github.copilot/rules -type f)" = "$COPRULE" ] &&
+    [ "$(sed -n '1p;3,4p' "$COPRULE")" = "$(printf -- '---\napplyTo: "**"\n---')" ] &&
+    [ "$(sed -e '1,5d' "$COPRULE")" = "$(sed 's/placed by a hook/placed by the Alynki plugin/' alynki-plugin/hooks/load-first.md)" ]
+}
+readmes_name_the_vscode_rule() {
+  local f
+  for f in README.md "$PLUGIN_README"; do grep -qF 'com.github.copilot/rules/' "$f" || return 1; done
+}
+ok "VS Code's rule applies everywhere and holds the wording of load-first.md" vscode_rule_is_the_wording
+ok "both READMEs name VS Code's rule" readmes_name_the_vscode_rule
 ok "both READMEs cover VS Code, GitHub Copilot CLI, chat.plugins.enabled and the preview status" readmes_cover_copilot
 
 # One pair of lists for every setup (alynki/alynki#3343, D9, J8; SEC-31, alynki/alynki#3447): 37 tools allowed,
@@ -742,18 +757,31 @@ cursor_setup_writes_the_lists() {
   local h out s=plugin-alynki-alynki
   h=$(mktemp -d) || return 1
   mkdir -p "$h/.cursor"
-  printf '{"mcpAllowlist":["other:tool","%s:grant_principal","%s:revoke_*","*:invite_*"],"terminalAllowlist":["ls"]}\n' "$s" "$s" >"$h/.cursor/permissions.json"
+  printf '{"mcpAllowlist":["other:tool","%s:grant_principal","%s:revoke_*","alynki:grant_principal","Alynki:update_*","*:invite_*"],"terminalAllowlist":["ls"]}\n' "$s" "$s" >"$h/.cursor/permissions.json"
   out=$(cursor_setup "$h") &&
-    jq -e --rawfile t "$LIST" --arg s "$s" '.terminalAllowlist == ["ls"] and .mcpAllowlist == ["other:tool","*:invite_*"] + ($t | split("\n") | map(select(length > 0) | $s + ":" + .))' "$h/.cursor/permissions.json" >/dev/null &&
+    jq -e --rawfile t "$LIST" '.terminalAllowlist == ["ls"] and .mcpAllowlist == ["other:tool","*:invite_*"] + [("plugin-alynki-alynki", "alynki") as $s | $t | split("\n")[] | select(length > 0) | $s + ":" + .]' "$h/.cursor/permissions.json" >/dev/null &&
     printf '%s' "$out" | grep -qF 'WARNING: the allow entry "*:invite_*" also covers invite_principal' &&
     cp "$h/.cursor/permissions.json" "$h/first" && cursor_setup "$h" | grep -qF 'already set up' && cmp -s "$h/first" "$h/.cursor/permissions.json"
   local r=$?; rm -rf "$h"; return $r
 }
-cursor_setup_from_nothing_allows_37() {
+cursor_setup_from_nothing_allows_74() {
   local h r
   h=$(mktemp -d) || return 1
-  cursor_setup "$h" >/dev/null && [ "$(jq '.mcpAllowlist | length' "$h/.cursor/permissions.json")" -eq 37 ] && ! cursor_setup "$h" | grep -q WARNING
+  cursor_setup "$h" >/dev/null && [ "$(jq '.mcpAllowlist | unique | length' "$h/.cursor/permissions.json")" -eq 74 ] &&
+    [ "$(jq -r '.mcpAllowlist[] | split(":")[1]' "$h/.cursor/permissions.json" | sort -u)" = "$(sort "$LIST")" ] && ! cursor_setup "$h" | grep -q WARNING
   r=$?; rm -rf "$h"; return $r
+}
+cursor_setup_warns_for_the_desktop_name() {
+  local h r
+  h=$(mktemp -d) || return 1
+  mkdir -p "$h/.cursor"
+  printf '{"mcpAllowlist":["alynk*:grant_principal"]}\n' >"$h/.cursor/permissions.json"
+  cursor_setup "$h" | grep -qF 'WARNING: the allow entry "alynk*:grant_principal" also covers grant_principal'
+  r=$?; rm -rf "$h"; return $r
+}
+cursor_says_alynki_matches_any_server() {
+  local f
+  for f in README.md "$PLUGIN_README" "$CURSKILL"; do grep -qF 'any other MCP server named `alynki`' "$f" || return 1; done
 }
 cursor_setup_refuses_comments() {
   local h r
@@ -771,9 +799,19 @@ cursor_hook_asks_for_the_seven_only() {
   while IFS= read -r t; do [ "$(cursor_ask plugin-alynki-alynki "$t")" = '{}' ] || return 1; done <"$LIST"
   [ "$(cursor_ask other grant_principal)" = '{}' ]
 }
+# Cursor desktop names the server alynki and sends its url.
+cursor_desktop_ask() { printf '{"mcp_server_name":"%s","url":"%s","tool_name":"%s"}' "$1" "$2" "$3" | sh -c "CURSOR_PLUGIN_ROOT=$PWD/alynki-plugin; $(jq -r '.hooks.beforeMCPExecution[0].command' "$CURHOOKS")"; }
+cursor_hook_asks_for_the_desktop_shape() {
+  local t
+  while IFS= read -r t; do [ "$(cursor_desktop_ask alynki "$MCP_URL" "$t" | jq -r .permission)" = ask ] || return 1; done <"$ASKLIST"
+  while IFS= read -r t; do [ "$(cursor_desktop_ask alynki "$MCP_URL" "$t")" = '{}' ] || return 1; done <"$LIST"
+  [ "$(cursor_desktop_ask other https://example.com/mcp grant_principal)" = '{}' ] && [ "$(cursor_desktop_ask alynki https://example.com/mcp grant_principal)" = '{}' ]
+}
 ok "Cursor lists one setup skill of its own, alynki-setup, which runs cursor/setup.sh" cursor_lists_its_own_setup_skill
-ok "cursor/setup.sh allows the 37, removes this server's entries covering the seven, keeps the rest, warns on a wider one and changes nothing twice" cursor_setup_writes_the_lists
-ok "cursor/setup.sh on an empty HOME writes exactly 37 entries and no warning" cursor_setup_from_nothing_allows_37
+ok "cursor/setup.sh allows the 37 under both server names, removes their entries covering the seven, keeps the rest, warns on a wider one and changes nothing twice" cursor_setup_writes_the_lists
+ok "cursor/setup.sh on an empty HOME writes the 37 under both server names (74 entries), never the seven, and no warning" cursor_setup_from_nothing_allows_74
+ok "cursor/setup.sh warns on a wider entry that reaches only the desktop server name" cursor_setup_warns_for_the_desktop_name
+ok "Cursor: both READMEs and the setup skill say alynki: entries also match any other server of that name" cursor_says_alynki_matches_any_server
 ok "cursor/setup.sh refuses a permissions.json with comments and leaves it untouched" cursor_setup_refuses_comments
 # The seven ask only in Run Mode Allowlist (founder decision on #3686, 2026-11-25): setup's message and both READMEs say so.
 cursor_says_run_mode_allowlist() {
@@ -791,6 +829,7 @@ vscode_manual_step() {
 }
 ok "VS Code: both READMEs give the manual approval step and the first-prompt timing (#3683)" vscode_manual_step
 ok "the Cursor beforeMCPExecution hook answers ask for the seven of Alynki's server and nothing else" cursor_hook_asks_for_the_seven_only
+ok "the Cursor hook asks for the seven in the desktop shape too (server alynki at Alynki's url), and nothing else" cursor_hook_asks_for_the_desktop_shape
 
 # Grok Build (alynki/alynki#3685). It installs the repository root: a root plugin.json in the installed folder wins over
 # .grok-plugin/plugin.json (Grok 1.0.92), and alynki-plugin/ has one.

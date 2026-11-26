@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "alynki",
-  "version": "0.34.1",
+  "version": "0.34.2",
   "description": "From your people to your customers, faster and with higher quality. Your people and their AI agents work from one business context layer, and every step is checked against it.",
   "author": {
     "name": "Alynki"

@@ -5,7 +5,9 @@
 # entry for this server that covers one of them is removed. Cursor has no "ask" list: what is not listed
 # asks. Other keys and entries are kept; running it twice changes nothing. Needs jq. Run: sh cursor/setup.sh
 set -eu
-SERVER=plugin-alynki-alynki # Cursor's name for a plugin's MCP server: plugin-<plugin>-<server>
+# The plugin's server is plugin-<plugin>-<server> in the Cursor CLI and plain <server> in the desktop app.
+# An "alynki:" entry also covers any other MCP server named alynki.
+SERVERS="plugin-alynki-alynki alynki"
 here=$(cd "$(dirname "$0")" && pwd)
 list=$here/../tools.txt
 asklist=$here/../ask-tools.txt
@@ -21,12 +23,13 @@ trap 'rm -f "$tmp"' EXIT
 src=$file
 [ -e "$file" ] || src=/dev/null
 # Cursor accepts comments in this file; jq does not, and rewriting would drop them.
-jq -s --rawfile t "$list" --rawfile a "$asklist" --arg s "$SERVER" '
+jq -s --rawfile t "$list" --rawfile a "$asklist" --arg s "$SERVERS" '
   def lines: split("\n") | map(select(length > 0));
   def glob: "^" + (gsub("(?<c>[^A-Za-z0-9_*-])"; "\\" + .c) | gsub("\\*"; ".*")) + "$";
-  ($a | lines) as $ask | ($t | lines | map($s + ":" + .)) as $new
+  ($s | split(" ")) as $servers | ($a | lines) as $ask
+  | [$servers[] as $n | $t | lines[] | $n + ":" + .] as $new
   | def covers_ask: split(":") as $p
-      | ($p | length) == 2 and ($p[0] | ascii_downcase) == $s
+      | ($p | length) == 2 and (($p[0] | ascii_downcase) as $q | any($servers[]; . == $q))
         and (($p[1] | ascii_downcase | glob) as $re | any($ask[]; test($re)));
   if length > 1 then error("more than one value") else (.[0] // {}) end
   | if type != "object" or ((.mcpAllowlist // []) | type != "array" or any(.[]; type != "string"))
@@ -34,7 +37,7 @@ jq -s --rawfile t "$list" --rawfile a "$asklist" --arg s "$SERVER" '
   | ((.mcpAllowlist // []) | map(select(covers_ask | not))) as $kept
   | .mcpAllowlist = $kept + ($new - $kept)
 ' "$src" >"$tmp" 2>/dev/null ||
-  fail "$file is not plain JSON with a string list mcpAllowlist (comments count); left untouched. Add \"$SERVER:<tool>\" for each name in $list to its mcpAllowlist by hand."
+  fail "$file is not plain JSON with a string list mcpAllowlist (comments count); left untouched. Add \"plugin-alynki-alynki:<tool>\" and \"alynki:<tool>\" for each name in $list to its mcpAllowlist by hand."
 if [ -e "$file" ] && [ "$(jq -S . "$file")" = "$(jq -S . "$tmp")" ]; then
   echo "Cursor: already set up, nothing changed ($file)"
 else
@@ -50,7 +53,9 @@ cli=$dir/cli-config.json
   server=${entry%%:*} tool=${entry#*:}
   while IFS= read -r t; do
     # shellcheck disable=SC2254 # the entry's parts are globs
-    case $SERVER in $server) case $t in $tool) echo "WARNING: the allow entry \"$entry\" also covers $t, which then runs without asking. Remove it."; break ;; esac ;; esac
+    for name in $SERVERS; do
+      case $name in $server) case $t in $tool) echo "WARNING: the allow entry \"$entry\" also covers $t, which then runs without asking. Remove it."; break 2 ;; esac ;; esac
+    done
   done <"$asklist"
 done
 cat <<'EOT'
