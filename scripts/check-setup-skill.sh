@@ -580,6 +580,19 @@ copilot_first_chat_connects() {
     jq -e '(.instructions | split("\n\n"))[2] | startswith("When the person has just allowed the connection or signed in to Alynki") and contains("call the tools again")' "$CP/declarativeAgent.json" >/dev/null &&
     ! jq -r .instructions "$CP/declarativeAgent.json" | grep -qiE 'unavailable|not available|cannot be called|can not be called'
 }
+copilot_instructions_work_a_whole_run() {
+  # the store package completes whole runs in one prompt (alynki/alynki#3842, proven as package C6 on #3152):
+  # the instructions name the whole chain, retry an out-of-scope token at the workflow's parent, offer a starter
+  # that works a run, and carry none of the phrases Microsoft's agent validation guidelines refuse
+  local ins f
+  ins=$(jq -r .instructions "$CP/declarativeAgent.json") || return 1
+  for f in load_context list_runs start_run load_step save_run load_check save_check load_run; do
+    printf '%s' "$ins" | grep -qF "$f" || return 1
+  done
+  printf '%s' "$ins" | grep -qF 'until a result carries stop' && printf '%s' "$ins" | grep -qF "workflow's parent" &&
+    jq -e 'any(.conversation_starters[]; .title == "Work a run" and (.text | test("until the end")))' "$CP/declarativeAgent.json" >/dev/null &&
+    ! jq -r '.instructions, .conversation_starters[].title, .conversation_starters[].text' "$CP/declarativeAgent.json" | grep -qiwE 'ignore|delete|reset|new instructions|if the user says'
+}
 copilot_icons_have_their_sizes() {
   [ "$(jq -r '.icons.color' "$CP/manifest.json")" = color.png ] && [ "$(jq -r '.icons.outline' "$CP/manifest.json")" = outline.png ] &&
     [ "$(png_dims "$CP/color.png")" = 192x192 ] && [ "$(png_dims "$CP/outline.png")" = 32x32 ]
@@ -616,6 +629,7 @@ readme_covers_copilot_package() {
 ok "the Copilot package's three JSON files parse" copilot_json_parses
 ok "the Copilot package is Teams manifest 1.19, declarative agent v1.6 and plugin v2.4, wired to each other, with a GUID id" copilot_schema_versions
 ok "the Copilot agent opens with a Connect starter, says to ask in a new chat after a sign-in, and never calls its tools unavailable" copilot_first_chat_connects
+ok "the Copilot agent works a whole run in one prompt: the chain of eight functions, a Work a run starter, no refused phrases" copilot_instructions_work_a_whole_run
 ok "the plugin's runtime is one RemoteMCPServer at https://mcp.alynki.com/mcp, the url the MCP files carry" copilot_runtime_url
 ok "the plugin's auth is OAuthPluginVault with the placeholder reference_id (the real id is never committed)" copilot_auth_is_the_vault
 ok "the plugin pins its tools: functions, run_for_functions and mcp-tools.json name the same tools, each with a description and inputSchema" copilot_tools_are_pinned
