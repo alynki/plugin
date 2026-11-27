@@ -446,7 +446,10 @@ declarative agent (v1.6) and the API plugin (v2.4), whose runtime is a `RemoteMC
 sign-in, `mcp.alynki.com` answers it with 401, and so no tool appears and nothing prompts the sign-in.
 `copilot/gen-tools.sh <token-file>` regenerates `mcp-tools.json` from the live server with an interactive
 token read from a file, and refuses if the server's tools differ from the plugin's tool list. The agent's instructions say to call
-`load_context` first, paged to completion, as the other clients do.
+`load_context` first, paged to completion, as the other clients do. To work a run ("Work my next ready Alynki run until the end"), they name the whole
+chain in one reply: `load_context`, `list_runs`, `start_run`, then each `next` the server returns (`load_step`,
+`save_run`, `load_check`, `save_check`) until `stop`, then `load_run`. Microsoft 365 Copilot with a Copilot licence
+works a run end to end this way; the free Copilot Chat ends a reply after about seven tool calls.
 
 The registration ID is not in the repository. Register the OAuth client in the Teams Developer
 Portal (Tools, OAuth client registration), then build the zip with its ID:
